@@ -1,10 +1,11 @@
+use clap::ValueEnum;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
-    targets: Vec<Target>,
-    output_format: Option<OutputFormat>,
-    log_level: Option<LogLevel>,
+    pub targets: Vec<Target>,
+    pub output_format: Option<OutputFormat>,
+    pub log_level: Option<LogLevel>,
 }
 
 impl Default for Config {
@@ -19,28 +20,28 @@ impl Default for Config {
 
 #[derive(Deserialize, Debug)]
 pub struct Target {
-    name: Option<String>,
-    version: String,
-    ecosystem: Option<String>,
-    advisory_type: AdvisoryType,
-    repository_path: Option<String>,
+    pub name: Option<String>,
+    pub version: String,
+    pub ecosystem: Option<String>,
+    pub advisory_type: AdvisoryType,
+    pub repository_path: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
-enum AdvisoryType {
+pub enum AdvisoryType {
     Github,
     GithubRepository,
 }
 
-#[derive(Deserialize, Debug)]
-enum OutputFormat {
+#[derive(Copy, Clone, Deserialize, ValueEnum, Debug)]
+pub enum OutputFormat {
     Json,
     Yaml,
     Text,
 }
 
-#[derive(Deserialize, Debug)]
-enum LogLevel {
+#[derive(Copy, Clone, Deserialize, ValueEnum, Debug)]
+pub enum LogLevel {
     Error,
     Warn,
     Info,
