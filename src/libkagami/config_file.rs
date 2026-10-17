@@ -2,6 +2,7 @@ use clap::ValueEnum;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
+#[serde(default)]
 pub struct Config {
     pub targets: Vec<Target>,
     pub output_format: Option<OutputFormat>,

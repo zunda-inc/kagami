@@ -1,5 +1,5 @@
-use clap::Parser;
 use crate::libkagami::{LogLevel, OutputFormat};
+use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[command(name = "kagami")]
@@ -16,5 +16,6 @@ pub struct KagamiCommands {
     #[arg(short, long, value_enum)]
     pub log_level: Option<LogLevel>,
     /// Sets a path to the config file. Default is `kagami.yaml` in the current directory.
+    #[arg(default_value = "kagami.yaml")]
     pub config_file_path: Option<String>,
 }
