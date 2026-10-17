@@ -29,7 +29,7 @@ pub enum Severity {
 pub struct Vulnerability {
     pub package: Package,
     pub vulnerable_version_range: String,
-    pub first_patched_version: Option<String>,
+    pub patched_versions: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
