@@ -47,6 +47,9 @@ impl Target {
         if self.advisory_type == AdvisoryType::GithubRepository && self.repository_path.is_none() {
             return Err(Box::new(TargetParseError::RepositoryPathNotSpecified));
         }
+        if self.advisory_type == AdvisoryType::Github && self.name.is_none() {
+            return Err(Box::new(TargetParseError::TargetNameNotSpecified));
+        }
 
         Ok(())
     }
@@ -55,6 +58,7 @@ impl Target {
 #[derive(Debug)]
 pub enum TargetParseError {
     RepositoryPathNotSpecified,
+    TargetNameNotSpecified,
 }
 
 impl Display for TargetParseError {
@@ -62,6 +66,9 @@ impl Display for TargetParseError {
         let message = match self {
             TargetParseError::RepositoryPathNotSpecified => {
                 "Please specify `repository_path` when the `advisory_type` is `github_repository`."
+            }
+            TargetParseError::TargetNameNotSpecified => {
+                "Please specify `name` when the `advisory_type` is `github`."
             }
         };
         write!(f, "{}", message)
