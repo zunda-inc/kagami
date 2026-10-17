@@ -1,7 +1,7 @@
 use clap::ValueEnum;
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 #[serde(default)]
 pub struct Config {
     pub targets: Vec<Target>,
@@ -14,12 +14,12 @@ impl Default for Config {
         Self {
             targets: Vec::new(),
             output_format: Some(OutputFormat::Text),
-            log_level: Some(LogLevel::Info),
+            log_level: Some(LogLevel::Warn),
         }
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct Target {
     pub name: Option<String>,
     pub version: String,
@@ -28,7 +28,7 @@ pub struct Target {
     pub repository_path: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Copy, Clone, Deserialize, Debug)]
 pub enum AdvisoryType {
     Github,
     GithubRepository,

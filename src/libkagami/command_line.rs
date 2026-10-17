@@ -12,10 +12,10 @@ pub struct KagamiCommands {
     /// Sets an output format. Default is `text`.
     #[arg(short, long, value_enum)]
     pub output_format: Option<OutputFormat>,
-    /// Sets a log level. Default is `info`.
+    /// Sets a log level. Default is `warn`.
     #[arg(short, long, value_enum)]
     pub log_level: Option<LogLevel>,
     /// Sets a path to the config file. Default is `kagami.yaml` in the current directory.
     #[arg(default_value = "kagami.yaml")]
-    pub config_file_path: Option<String>,
+    pub config_file_path: String,
 }
