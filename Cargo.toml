@@ -1,0 +1,8 @@
+[package]
+name = "kagami"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+yaml_serde = "0.10.7"
+serde = { version = "1.0.229", features = ["derive"] }

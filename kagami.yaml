@@ -1,0 +1,10 @@
+targets:
+  - name: test
+    version: 6.6.1
+    # you can specify the ecosystem to search from github advisories.
+    ecosystem: npm
+    # github or github_repository
+    advisory_type: github
+    # specify when github_repository is used
+    repository_path: indutny/elliptic
+output_format: json
