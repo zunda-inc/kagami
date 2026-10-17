@@ -3,7 +3,7 @@ use crate::libkagami::config_merger::merge_config;
 use crate::libkagami::logger::{initialize_default_logger, initialize_logger_by_loglevel};
 use crate::libkagami::{Config, KagamiCommands};
 use clap::Parser;
-use log::{error, info, trace};
+use log::{error, info};
 use std::process::ExitCode;
 
 mod libkagami;
