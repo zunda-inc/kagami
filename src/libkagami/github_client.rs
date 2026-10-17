@@ -1,4 +1,4 @@
-use log::{debug, error, warn};
+use log::{debug, warn};
 use octocrab::Octocrab;
 use std::env;
 use tokio::process::Command;
