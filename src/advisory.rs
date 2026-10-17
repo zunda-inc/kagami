@@ -1,4 +1,15 @@
+use crate::AdvisoryType;
 use chrono::{DateTime, Utc};
+
+#[derive(Debug, Clone)]
+pub struct TargetWithAdvisory {
+    pub name: Option<String>,
+    pub version: String,
+    pub ecosystem: Option<String>,
+    pub advisory_type: AdvisoryType,
+    pub repository_path: Option<String>,
+    pub advisories: Vec<Advisory>,
+}
 
 #[derive(Debug, Clone)]
 pub struct Advisory {
