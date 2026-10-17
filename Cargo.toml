@@ -10,3 +10,4 @@ clap = { version = "4.6.7", features = ["derive"] }
 simplelog = "0.12.2"
 log = "0.4.34"
 semver = "1.0.28"
+octocrab = "0.54.5"
