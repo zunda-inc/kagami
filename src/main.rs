@@ -8,7 +8,8 @@ use std::process::ExitCode;
 
 mod libkagami;
 
-fn main() -> ExitCode {
+#[tokio::main]
+async fn main() -> ExitCode {
     initialize_default_logger();
 
     let command = KagamiCommands::parse();
