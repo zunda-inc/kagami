@@ -8,3 +8,4 @@ pub use command_line::*;
 pub mod logger;
 pub mod ghsa;
 pub mod github_client;
+pub mod advisory;
