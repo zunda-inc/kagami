@@ -1,6 +1,6 @@
-use crate::libkagami::LogLevel;
 use log::LevelFilter;
 use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode};
+use crate::LogLevel;
 
 pub fn initialize_default_logger() {
     CombinedLogger::init(vec![TermLogger::new(

@@ -1,4 +1,4 @@
-use crate::libkagami::{Config, KagamiCommands};
+use crate::{Config, KagamiCommands};
 
 pub fn merge_config(file_config: &Config, command_line_options: &KagamiCommands) -> Config {
     Config {

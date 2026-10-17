@@ -1,6 +1,6 @@
-use crate::libkagami::Config;
 use std::error::Error;
 use std::fs;
+use crate::Config;
 
 pub fn parse_config_file(file_path: impl Into<String>) -> Result<Config, Box<dyn Error>> {
     let config_content = fs::read_to_string(file_path.into())?;
