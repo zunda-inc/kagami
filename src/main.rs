@@ -1,5 +1,6 @@
 use crate::libkagami::config_file_parser::parse_config_file;
 use crate::libkagami::config_merger::merge_config;
+use crate::libkagami::github_client::init_octocrab;
 use crate::libkagami::logger::{initialize_default_logger, initialize_logger_by_loglevel};
 use crate::libkagami::{Config, KagamiCommands};
 use clap::Parser;
@@ -41,6 +42,15 @@ async fn main() -> ExitCode {
         error!("{}", e.to_string());
         return ExitCode::FAILURE;
     }
+
+    let octocrab = match init_octocrab().await {
+        Ok(o) => o,
+        Err(e) => {
+            error!("Failed to initialize GitHub client.");
+            error!("{}", e.to_string());
+            return ExitCode::FAILURE;
+        }
+    };
 
     println!("Hello, world!");
     ExitCode::SUCCESS
