@@ -71,12 +71,14 @@ impl Display for TargetParseError {
 impl Error for TargetParseError {}
 
 #[derive(PartialEq, Copy, Clone, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
 pub enum AdvisoryType {
     Github,
     GithubRepository,
 }
 
 #[derive(PartialEq, Copy, Clone, Deserialize, ValueEnum, Debug)]
+#[serde(rename_all = "snake_case")]
 pub enum OutputFormat {
     Json,
     Yaml,
@@ -84,6 +86,7 @@ pub enum OutputFormat {
 }
 
 #[derive(PartialEq, Copy, Clone, Deserialize, ValueEnum, Debug)]
+#[serde(rename_all = "snake_case")]
 pub enum LogLevel {
     Error,
     Warn,
