@@ -5,7 +5,8 @@ pub mod config_file_parser;
 pub mod config_merger;
 
 pub use command_line::*;
-pub mod logger;
+pub mod advisory;
+pub mod error;
 pub mod ghsa;
 pub mod github_client;
-pub mod advisory;
+pub mod logger;
