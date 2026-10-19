@@ -75,18 +75,7 @@ fn process_advisory_type_github(
             None => continue,
         };
 
-        let is_target_versions: Vec<bool> = vulnerabilities
-            .iter()
-            .map(|v| {
-                let vulnerable_version_range = match &v.vulnerable_version_range {
-                    Some(r) => r,
-                    None => return Ok(false),
-                };
-                version_is_in_target_range(&target.version, vulnerable_version_range)
-            })
-            .try_collect()?;
-
-        if !is_target_versions.iter().any(|r| *r) {
+        if !is_target_version_for_vulnerabilities(&target.version, &vulnerabilities)? {
             continue;
         }
 
@@ -105,9 +94,43 @@ fn process_advisory_type_github(
 
 fn process_advisory_type_github_repository(
     target: &Target,
-    results: &Vec<gh::SecurityAdvisory>,
+    results: &Vec<gh::RepositoryAdvisory>,
 ) -> Result<Vec<TargetWithAdvisory>, Box<dyn Error>> {
-    todo!()
+    let mut mapped_results: Vec<TargetWithAdvisory> = vec![];
+
+    for advisory in results {
+        let vulnerabilities = match &advisory.vulnerabilities {
+            Some(v) => v,
+            None => continue,
+        };
+
+        if !is_target_version_for_vulnerabilities(&target.version, &vulnerabilities)? {
+            continue;
+        }
+
+        // ここでmapして返したい
+    }
+
+    Ok(mapped_results)
+}
+
+fn is_target_version_for_vulnerabilities(
+    target_version: impl Into<String>,
+    vulnerabilities: &Vec<octocrab::models::security_advisories::Vulnerability>,
+) -> Result<bool, Box<dyn Error>> {
+    let target_version: String = target_version.into();
+    let is_target_versions: Vec<bool> = vulnerabilities
+        .iter()
+        .map(|v| {
+            let vulnerable_version_range = match &v.vulnerable_version_range {
+                Some(r) => r,
+                None => return Ok(false),
+            };
+            version_is_in_target_range(&target_version, vulnerable_version_range)
+        })
+        .try_collect()?;
+
+    Ok(is_target_versions.iter().any(|r| *r))
 }
 
 fn map_advisory(advisory: &gh::SecurityAdvisory) -> Advisory {
