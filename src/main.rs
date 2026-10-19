@@ -1,11 +1,12 @@
 use clap::Parser;
-use log::{error, info};
-use std::process::ExitCode;
 use kagami::config_file_parser::parse_config_file;
 use kagami::config_merger::merge_config;
-use kagami::{Config, KagamiCommands};
+use kagami::ghsa::find_vulnerabilities;
 use kagami::github_client::init_octocrab;
 use kagami::logger::{initialize_default_logger, initialize_logger_by_loglevel};
+use kagami::{Config, KagamiCommands};
+use log::{error, info};
+use std::process::ExitCode;
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -45,6 +46,16 @@ async fn main() -> ExitCode {
         Ok(o) => o,
         Err(e) => {
             error!("Failed to initialize GitHub client.");
+            error!("{}", e.to_string());
+            return ExitCode::FAILURE;
+        }
+    };
+
+    info!("Checking vulnerabilities based on the configration.");
+    let results = match find_vulnerabilities(&merged_config.targets, &octocrab).await {
+        Ok(o) => o,
+        Err(e) => {
+            error!("Failed to check the vulnerabilities.");
             error!("{}", e.to_string());
             return ExitCode::FAILURE;
         }
