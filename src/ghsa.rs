@@ -18,7 +18,6 @@ pub async fn find_vulnerabilities(
     for target in targets {
         match target.advisory_type {
             AdvisoryType::Github => {
-                // いい感じに
                 let target_version = &target.version;
                 let target_name = match &target.name {
                     Some(s) => format!("{s}@{target_version}"),
@@ -37,11 +36,26 @@ pub async fn find_vulnerabilities(
                 query = query.per_page(100);
                 let page_result = query.send().await?;
                 let all_result = octocrab.all_pages(page_result).await?;
-                let mapped_results = process_advisory_type_github_page(&target, &all_result)?;
+                let mapped_results = process_advisory_type_github(&target, &all_result)?;
                 results.extend(mapped_results);
             }
             AdvisoryType::GithubRepository => {
-                // いい感じに
+                let repository_path = match target.extract_repository_path()? {
+                    Some(s) => s,
+                    None => {
+                        return Err(Box::new(KagamiError::OptionalGuard(
+                            "repository_path".to_string(),
+                        )));
+                    }
+                };
+                let repo_adv_page = octocrab
+                    .repos(repository_path[0], repository_path[1])
+                    .security_advisories()
+                    .list()
+                    .state("published")
+                    .send()
+                    .await?;
+                let all_result = octocrab.all_pages(repo_adv_page).await?;
             }
         }
     }
@@ -49,7 +63,7 @@ pub async fn find_vulnerabilities(
     Ok(results)
 }
 
-fn process_advisory_type_github_page(
+fn process_advisory_type_github(
     target: &Target,
     results: &Vec<gh::SecurityAdvisory>,
 ) -> Result<Vec<TargetWithAdvisory>, Box<dyn Error>> {
@@ -87,6 +101,13 @@ fn process_advisory_type_github_page(
     }
 
     Ok(mapped_results)
+}
+
+fn process_advisory_type_github_repository(
+    target: &Target,
+    results: &Vec<gh::SecurityAdvisory>,
+) -> Result<Vec<TargetWithAdvisory>, Box<dyn Error>> {
+    todo!()
 }
 
 fn map_advisory(advisory: &gh::SecurityAdvisory) -> Advisory {
