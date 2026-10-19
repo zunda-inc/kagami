@@ -1,4 +1,5 @@
 use clap::ValueEnum;
+use semver::Version;
 use serde::Deserialize;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -50,6 +51,9 @@ impl Target {
         if self.advisory_type == AdvisoryType::Github && self.name.is_none() {
             return Err(Box::new(TargetParseError::TargetNameNotSpecified));
         }
+        if Version::parse(&self.version).is_err() {
+            return Err(Box::new(TargetParseError::VersionNotParsable));
+        }
 
         Ok(())
     }
@@ -59,6 +63,7 @@ impl Target {
 pub enum TargetParseError {
     RepositoryPathNotSpecified,
     TargetNameNotSpecified,
+    VersionNotParsable,
 }
 
 impl Display for TargetParseError {
@@ -70,6 +75,7 @@ impl Display for TargetParseError {
             TargetParseError::TargetNameNotSpecified => {
                 "Please specify `name` when the `advisory_type` is `github`."
             }
+            TargetParseError::VersionNotParsable => "`version` is not valid semver.",
         };
         write!(f, "{}", message)
     }
