@@ -111,7 +111,14 @@ fn process_advisory_type_github_repository(
             continue;
         }
 
-        // ここでmapして返したい
+        mapped_results.push(TargetWithAdvisory {
+            name: target.name.clone(),
+            version: target.version.clone(),
+            ecosystem: target.ecosystem.clone(),
+            advisory_type: target.advisory_type,
+            repository_path: target.repository_path.clone(),
+            advisories: vec![map_repository_advisory(advisory)?],
+        });
     }
 
     Ok(mapped_results)
@@ -137,28 +144,13 @@ fn is_target_version_for_vulnerabilities(
 }
 
 fn map_advisory(advisory: &gh::SecurityAdvisory) -> Advisory {
-    let cvss = advisory.cvss_severities.as_ref();
-    let map_score = |score: Option<&gh::CvssScore>| CvssScore {
-        vector_string: score.and_then(|s| s.vector_string.clone()),
-        score: score.and_then(|s| s.score),
-    };
-
     Advisory {
         ghsa_id: advisory.ghsa_id.clone(),
         cve_id: advisory.cve_id.clone(),
         summary: advisory.summary.clone(),
         description: advisory.description.clone().unwrap_or_default(),
-        severity: match advisory.severity.as_str() {
-            "low" => Severity::Low,
-            "medium" => Severity::Medium,
-            "high" => Severity::High,
-            "critical" => Severity::Critical,
-            _ => Severity::Unknown,
-        },
-        cvss_severities: CvssSeverities {
-            cvss_v3: map_score(cvss.and_then(|c| c.cvss_v3.as_ref())),
-            cvss_v4: map_score(cvss.and_then(|c| c.cvss_v4.as_ref())),
-        },
+        severity: map_severity(&advisory.severity),
+        cvss_severities: map_cvss_severities(advisory.cvss_severities.as_ref()),
         epss: advisory
             .epss
             .as_ref()
@@ -177,6 +169,58 @@ fn map_advisory(advisory: &gh::SecurityAdvisory) -> Advisory {
             .flatten()
             .map(map_vulnerability)
             .collect(),
+    }
+}
+
+fn map_repository_advisory(advisory: &gh::RepositoryAdvisory) -> Result<Advisory, KagamiError> {
+    let published_at = advisory
+        .published_at
+        .ok_or_else(|| KagamiError::OptionalGuard("advisory.published_at".to_string()))?;
+    let updated_at = advisory
+        .updated_at
+        .ok_or_else(|| KagamiError::OptionalGuard("advisory.updated_at".to_string()))?;
+
+    Ok(Advisory {
+        ghsa_id: advisory.ghsa_id.clone(),
+        cve_id: advisory.cve_id.clone(),
+        summary: advisory.summary.clone(),
+        description: advisory.description.clone().unwrap_or_default(),
+        severity: map_severity(advisory.severity.as_deref().unwrap_or_default()),
+        cvss_severities: map_cvss_severities(advisory.cvss_severities.as_ref()),
+        // Repository advisories don't carry EPSS.
+        epss: None,
+        html_url: advisory.html_url.to_string(),
+        published_at,
+        updated_at,
+        withdrawn_at: advisory.withdrawn_at,
+        vulnerabilities: advisory
+            .vulnerabilities
+            .iter()
+            .flatten()
+            .map(map_vulnerability)
+            .collect(),
+    })
+}
+
+fn map_severity(severity: &str) -> Severity {
+    match severity {
+        "low" => Severity::Low,
+        "medium" => Severity::Medium,
+        "high" => Severity::High,
+        "critical" => Severity::Critical,
+        _ => Severity::Unknown,
+    }
+}
+
+fn map_cvss_severities(cvss: Option<&gh::CvssSeverities>) -> CvssSeverities {
+    let map_score = |score: Option<&gh::CvssScore>| CvssScore {
+        vector_string: score.and_then(|s| s.vector_string.clone()),
+        score: score.and_then(|s| s.score),
+    };
+
+    CvssSeverities {
+        cvss_v3: map_score(cvss.and_then(|c| c.cvss_v3.as_ref())),
+        cvss_v4: map_score(cvss.and_then(|c| c.cvss_v4.as_ref())),
     }
 }
 
