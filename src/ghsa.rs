@@ -53,9 +53,12 @@ pub async fn find_vulnerabilities(
                     .security_advisories()
                     .list()
                     .state("published")
+                    .per_page(100)
                     .send()
                     .await?;
                 let all_result = octocrab.all_pages(repo_adv_page).await?;
+                let mapped_results = process_advisory_type_github_repository(&target, &all_result)?;
+                results.extend(mapped_results);
             }
         }
     }
