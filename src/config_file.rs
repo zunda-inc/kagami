@@ -1,6 +1,6 @@
 use clap::ValueEnum;
 use semver::Version;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
@@ -108,7 +108,7 @@ impl Display for TargetParseError {
 
 impl Error for TargetParseError {}
 
-#[derive(PartialEq, Copy, Clone, Deserialize, Debug)]
+#[derive(PartialEq, Copy, Clone, Deserialize, Serialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum AdvisoryType {
     Github,

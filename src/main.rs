@@ -4,8 +4,9 @@ use kagami::config_merger::merge_config;
 use kagami::ghsa::find_vulnerabilities;
 use kagami::github_client::init_octocrab;
 use kagami::logger::{initialize_default_logger, initialize_logger_by_loglevel};
+use kagami::output::output_to_stdout;
 use kagami::{Config, KagamiCommands};
-use log::{error, info};
+use log::{error, info, trace};
 use std::process::ExitCode;
 
 #[tokio::main]
@@ -60,7 +61,23 @@ async fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    info!("Retrieved the vulnerabilities.");
+    let output_format = match merged_config.output_format {
+        Some(f) => f,
+        None => {
+            error!("Unexpected: `output_format` is not set.");
+            return ExitCode::FAILURE;
+        }
+    };
+    trace!("Output style is {:?}.", output_format);
+    match output_to_stdout(&output_format, &results) {
+        Err(e) => {
+            error!("Failed to check the vulnerabilities.");
+            error!("{}", e.to_string());
+            return ExitCode::FAILURE;
+        }
+        _ => {}
+    };
 
-    println!("Hello, world!");
     ExitCode::SUCCESS
 }

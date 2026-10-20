@@ -10,3 +10,4 @@ pub mod error;
 pub mod ghsa;
 pub mod github_client;
 pub mod logger;
+pub mod output;

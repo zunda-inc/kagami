@@ -951,6 +951,7 @@ dependencies = [
  "octocrab",
  "semver",
  "serde",
+ "serde_json",
  "simplelog",
  "tokio",
  "yaml_serde",
