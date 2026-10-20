@@ -1,6 +1,6 @@
-use log::LevelFilter;
-use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode};
 use crate::LogLevel;
+use log::{LevelFilter, debug};
+use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode};
 
 pub fn initialize_default_logger() {
     CombinedLogger::init(vec![TermLogger::new(
@@ -21,5 +21,7 @@ pub fn initialize_logger_by_loglevel(log_level: &LogLevel) {
         LogLevel::Debug => LevelFilter::Debug,
         LogLevel::Trace => LevelFilter::Trace,
     };
+
     log::set_max_level(level_filter);
+    debug!("Log level is set to {:?}.", log_level);
 }

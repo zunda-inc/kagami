@@ -19,31 +19,33 @@ async fn get_github_pat() -> Result<Option<String>, Box<dyn Error>> {
     }
 
     // Check if it has gh command and has valid token from it
-    debug!("Fall backing to `gh auth token` command.");
+    debug!("Falling back to the `gh auth token` command.");
     let command_result = Command::new(COMMAND_GH)
         .args(COMMAND_GH_AUTH_TOKEN_ARGS)
         .output()
         .await;
-    if let Ok(command_output) = command_result {
-        if !command_output.status.success() {
-            warn!(
-                "Failed to run `gh auth token` command. Command's status code returned non zero value."
-            );
-            ()
-        }
-        return Ok(Some(
-            String::from_utf8(command_output.stdout)?.trim().to_string(),
-        ));
-    }
 
-    if let Err(e) = command_result {
-        warn!("Failed to run `gh auth token` command.");
-        warn!("{}", e.to_string());
+    match command_result {
+        Ok(command_output) if command_output.status.success() => {
+            debug!("Retrieved a token from the `gh auth token` command.");
+            return Ok(Some(
+                String::from_utf8(command_output.stdout)?.trim().to_string(),
+            ));
+        }
+        Ok(command_output) => {
+            debug!(
+                "The `gh auth token` command failed with {}.",
+                command_output.status
+            );
+        }
+        Err(e) => {
+            debug!("Could not run the `gh` command: {}.", e);
+        }
     }
 
     // Could not get token, will fall back to None
     warn!(
-        "Failed to retrieve GitHub PAT from your environment. It will call the API anonymously. Be careful for the API rate limiting!"
+        "Failed to retrieve GitHub PAT from your environment. It will call the API anonymously. Be careful of the API rate limit! Set `GH_TOKEN` or `GITHUB_TOKEN`, or log in with `gh auth login`."
     );
     Ok(None)
 }
@@ -53,6 +55,7 @@ pub async fn init_octocrab() -> Result<Octocrab, Box<dyn Error>> {
 
     let pat_result = get_github_pat().await?;
     if let Some(pat) = pat_result {
+        debug!("Initializing the GitHub client with a personal access token.");
         builder = builder.personal_token(pat);
     }
 

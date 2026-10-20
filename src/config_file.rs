@@ -1,4 +1,5 @@
 use clap::ValueEnum;
+use log::{debug, trace};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -14,12 +15,17 @@ pub struct Config {
 
 impl Config {
     pub fn validate(&self) -> Result<(), Box<dyn Error>> {
+        debug!("Validating {} targets.", self.targets.len());
+
         for target in &self.targets {
+            trace!("Validating target {:?}.", target);
+
             let validate_result = target.validate();
             if let Err(e) = validate_result {
                 return Err(e);
             };
         }
+
         Ok(())
     }
 }

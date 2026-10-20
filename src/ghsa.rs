@@ -4,6 +4,7 @@ use crate::advisory::{
 use crate::error::KagamiError;
 use crate::{AdvisoryType, Target};
 use itertools::Itertools;
+use log::{debug, info, trace};
 use octocrab::Octocrab;
 use octocrab::models::security_advisories as gh;
 use semver::{Version, VersionReq};
@@ -27,16 +28,38 @@ pub async fn find_vulnerabilities(
                         )));
                     }
                 };
+
+                info!(
+                    "Checking `{}` in the GitHub advisory database (ecosystem: {}).",
+                    target_name,
+                    target.ecosystem.as_deref().unwrap_or("any")
+                );
+
                 let security_advisories_query = octocrab.security_advisories();
-                let mut query = security_advisories_query.list().affects(target_name);
+                let mut query = security_advisories_query
+                    .list()
+                    .affects(target_name.clone());
                 match &target.ecosystem {
                     Some(ecosystem) => query = query.ecosystem(ecosystem),
                     None => {}
                 };
                 query = query.per_page(100);
+
                 let page_result = query.send().await?;
                 let all_result = octocrab.all_pages(page_result).await?;
+                debug!(
+                    "Fetched {} advisories for `{}`.",
+                    all_result.len(),
+                    target_name
+                );
+
                 let mapped_results = process_advisory_type_github(&target, &all_result)?;
+                debug!(
+                    "{} of them affect `{}`.",
+                    mapped_results.advisories.len(),
+                    target_name
+                );
+
                 results.push(mapped_results);
             }
             AdvisoryType::GithubRepository => {
@@ -48,6 +71,12 @@ pub async fn find_vulnerabilities(
                         )));
                     }
                 };
+
+                info!(
+                    "Checking the advisories published in `{}/{}` for version `{}`.",
+                    repository_path[0], repository_path[1], target.version
+                );
+
                 let repo_adv_page = octocrab
                     .repos(repository_path[0], repository_path[1])
                     .security_advisories()
@@ -57,7 +86,20 @@ pub async fn find_vulnerabilities(
                     .send()
                     .await?;
                 let all_result = octocrab.all_pages(repo_adv_page).await?;
+                debug!(
+                    "Fetched {} published advisories from `{}/{}`.",
+                    all_result.len(),
+                    repository_path[0],
+                    repository_path[1]
+                );
+
                 let mapped_results = process_advisory_type_github_repository(&target, &all_result)?;
+                debug!(
+                    "{} of them affect version `{}`.",
+                    mapped_results.advisories.len(),
+                    target.version
+                );
+
                 results.push(mapped_results);
             }
         }
@@ -75,13 +117,27 @@ fn process_advisory_type_github(
     for advisory in results {
         let vulnerabilities = match &advisory.vulnerabilities {
             Some(v) => v,
-            None => continue,
+            None => {
+                trace!(
+                    "`{}` has no vulnerability entries, skipped.",
+                    advisory.ghsa_id
+                );
+                continue;
+            }
         };
 
         if !is_target_version_for_vulnerabilities(&target.version, &vulnerabilities)? {
+            trace!(
+                "`{}` does not affect version `{}`, skipped.",
+                advisory.ghsa_id, target.version
+            );
             continue;
         }
 
+        trace!(
+            "`{}` affects version `{}`.",
+            advisory.ghsa_id, target.version
+        );
         mapped_advisories.push(map_advisory(advisory));
     }
 
@@ -104,13 +160,27 @@ fn process_advisory_type_github_repository(
     for advisory in results {
         let vulnerabilities = match &advisory.vulnerabilities {
             Some(v) => v,
-            None => continue,
+            None => {
+                trace!(
+                    "`{}` has no vulnerability entries, skipped.",
+                    advisory.ghsa_id
+                );
+                continue;
+            }
         };
 
         if !is_target_version_for_vulnerabilities(&target.version, &vulnerabilities)? {
+            trace!(
+                "`{}` does not affect version `{}`, skipped.",
+                advisory.ghsa_id, target.version
+            );
             continue;
         }
 
+        trace!(
+            "`{}` affects version `{}`.",
+            advisory.ghsa_id, target.version
+        );
         mapped_advisories.push(map_repository_advisory(advisory)?);
     }
 
@@ -252,10 +322,12 @@ fn version_is_in_target_range(
     version: impl Into<String>,
     target_range: impl Into<String>,
 ) -> Result<bool, Box<dyn Error>> {
-    let parsed_version = match Version::parse(&version.into()) {
+    let version: String = version.into();
+    let parsed_version = match Version::parse(&version) {
         Ok(v) => v,
         Err(e) => return Err(Box::new(e)),
     };
+
     let target_range = target_range.into();
     let target_ranges = target_range.split("||").map(|s| s.trim());
 
@@ -266,9 +338,14 @@ fn version_is_in_target_range(
         };
 
         if req.matches(&parsed_version) {
+            trace!("Version `{}` matches the range `{}`.", version, range);
             return Ok(true);
         }
     }
 
+    trace!(
+        "Version `{}` does not match the range `{}`.",
+        version, target_range
+    );
     Ok(false)
 }

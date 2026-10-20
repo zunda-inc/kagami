@@ -3,6 +3,7 @@ use crate::advisory::{Advisory, CvssScore, Epss, Severity, TargetWithAdvisory, V
 use crate::error::KagamiError;
 use chrono::{DateTime, Utc};
 use console::{Color, Term, style};
+use log::trace;
 use std::error::Error;
 
 pub fn output_to_stdout(
@@ -286,8 +287,14 @@ fn print_console_divider(terminal: &Term) -> Result<(), Box<dyn Error>> {
             .ok_or(Box::new(KagamiError::OptionalGuard(
                 "write_width".to_string(),
             )))?;
+    trace!(
+        "Terminal width is {}, divider width is {}.",
+        width, write_width
+    );
+
     let divider_str = "━".repeat(usize::from(write_width));
     terminal.write_line(style(divider_str).cyan().to_string().as_str())?;
+
     Ok(())
 }
 
