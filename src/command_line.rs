@@ -9,13 +9,13 @@ use crate::{LogLevel, OutputFormat};
     long_about= None
 )]
 pub struct KagamiCommands {
-    /// Sets an output format.
-    #[arg(short, long, value_enum, default_value = "text")]
+    /// Sets an output format, overriding the one in the config file [default: text]
+    #[arg(short, long, value_enum)]
     pub output_format: Option<OutputFormat>,
-    /// Sets a log level.
-    #[arg(short, long, value_enum, default_value = "warn")]
+    /// Sets a log level, overriding the one in the config file [default: warn]
+    #[arg(short, long, value_enum)]
     pub log_level: Option<LogLevel>,
-    /// Sets a path to the config file. Default is `kagami.yaml` in the current directory.
+    /// Sets a path to the config file, relative to the current directory.
     #[arg(default_value = "kagami.yaml")]
     pub config_file_path: String,
 }
