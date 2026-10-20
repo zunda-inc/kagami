@@ -3,6 +3,7 @@ use crate::advisory::{Advisory, Severity, TargetWithAdvisory};
 use crate::error::KagamiError;
 use console::{Color, Term, style};
 use std::error::Error;
+use std::io::Write;
 
 pub fn output_to_stdout(
     output_format: &OutputFormat,
@@ -37,15 +38,15 @@ fn output_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), Box<dyn Error>> 
             "{} Advisories found for {} targets - {} {}, {} {}, {} {}, {} {}, {} {}",
             style(total_count).bold().cyan(),
             style(target_count).bold().cyan(),
-            style("Critical").bold().white().bg(Color::Red),
+            styled_severity(Severity::Critical),
             style(critical_count).bold(),
-            style("High").bold().red(),
+            styled_severity(Severity::High),
             style(high_count).bold(),
-            style("Medium").bold().yellow(),
+            styled_severity(Severity::Medium),
             style(medium_count).bold(),
-            style("Low").bold().green(),
+            styled_severity(Severity::Low),
             style(low_count).bold(),
-            style("Unknown").bold().white().bg(Color::Black),
+            styled_severity(Severity::Unknown),
             style(unknown_count).bold()
         )
         .as_str(),
@@ -89,19 +90,32 @@ fn output_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), Box<dyn Error>> 
             format!(
                 "{} Advisories found - {} {}, {} {}, {} {}, {} {}, {} {}",
                 style(total_count).bold().cyan(),
-                style("Critical").bold().white().bg(Color::Red),
+                styled_severity(Severity::Critical),
                 style(critical_count).bold(),
-                style("High").bold().red(),
+                styled_severity(Severity::High),
                 style(high_count).bold(),
-                style("Medium").bold().yellow(),
+                styled_severity(Severity::Medium),
                 style(medium_count).bold(),
-                style("Low").bold().green(),
+                styled_severity(Severity::Low),
                 style(low_count).bold(),
-                style("Unknown").bold().white().bg(Color::Black),
+                styled_severity(Severity::Unknown),
                 style(unknown_count).bold()
             )
             .as_str(),
         )?;
+
+        for advisory in &target.advisories {
+            // Title line
+            stdout_terminal.write_line(
+                format!(
+                    "{} - {}",
+                    styled_severity(advisory.severity),
+                    style(&advisory.summary).cyan().bold()
+                )
+                .as_str(),
+            )?;
+            // Detailed output
+        }
     }
 
     Ok(())
