@@ -278,7 +278,7 @@ fn formatted_date(date: &DateTime<Utc>) -> String {
 
 fn print_console_divider(terminal: &Term) -> Result<(), Box<dyn Error>> {
     let (_, width) = terminal.size();
-    let min_size = 100u16;
+    let min_size = 150u16;
     let write_width =
         [min_size, width]
             .into_iter()
