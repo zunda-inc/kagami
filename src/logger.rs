@@ -9,7 +9,8 @@ pub fn initialize_default_logger() {
         TerminalMode::Stderr,
         ColorChoice::Auto,
     )])
-    .unwrap()
+    .unwrap();
+    log::set_max_level(LevelFilter::Trace);
 }
 
 pub fn initialize_logger_by_loglevel(log_level: &LogLevel) {
@@ -20,11 +21,5 @@ pub fn initialize_logger_by_loglevel(log_level: &LogLevel) {
         LogLevel::Debug => LevelFilter::Debug,
         LogLevel::Trace => LevelFilter::Trace,
     };
-    CombinedLogger::init(vec![TermLogger::new(
-        level_filter,
-        Config::default(),
-        TerminalMode::Stderr,
-        ColorChoice::Auto,
-    )])
-    .unwrap()
+    log::set_max_level(level_filter);
 }
