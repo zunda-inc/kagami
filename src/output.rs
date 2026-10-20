@@ -6,8 +6,8 @@ use std::cmp::Reverse;
 use std::error::Error;
 use std::fmt::Display;
 
-static PACKAGE: Emoji<'_, '_> = Emoji("📦 ", "");
-static CHECK: Emoji<'_, '_> = Emoji("✅ ", "");
+static PACKAGE: Emoji = Emoji("📦 ", "");
+static CHECK: Emoji = Emoji("✅ ", "");
 
 const INDENT: &str = "  ";
 /// Width of the severity badge column. Advisory details are aligned right after it.
