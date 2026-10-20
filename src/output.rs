@@ -73,7 +73,7 @@ fn output_simple_markdown_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), 
             stdout_terminal.write_line(
                 format!(
                     "{} [{}] {}",
-                    markdown_emoji_severity(advisory.severity),
+                    emoji_severity(advisory.severity),
                     advisory.severity.to_string(),
                     advisory.html_url
                 )
@@ -195,13 +195,13 @@ fn styled_severity(severity: Severity) -> String {
     .to_string()
 }
 
-fn markdown_emoji_severity(severity: Severity) -> String {
+fn emoji_severity(severity: Severity) -> String {
     match severity {
-        Severity::Unknown => ":white_circle:",
-        Severity::Low => ":white_circle:",
-        Severity::Medium => ":orange_circle:",
-        Severity::High => ":red_circle:",
-        Severity::Critical => ":rotating_light:",
+        Severity::Unknown => "⚪",
+        Severity::Low => "⚪",
+        Severity::Medium => "🟠",
+        Severity::High => "🔴",
+        Severity::Critical => "🚨",
     }
     .to_string()
 }
