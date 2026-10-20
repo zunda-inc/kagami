@@ -1,10 +1,34 @@
+# Test configuration for kagami.
+# Every target is pinned to a version that is known to have published advisories,
+# so a run prints at least one advisory for each of them.
 targets:
-  - name: test
-    version: 6.6.1
-    # you can specify the ecosystem to search from github advisories.
+  # `github` searches GitHub's global advisory database by package name.
+  # `ecosystem` narrows the search (npm, pip, rust, go, maven, rubygems, ...).
+  - name: lodash
+    version: 4.17.20
     ecosystem: npm
-    # github or github_repository
     advisory_type: github
-    # specify when github_repository is used
+
+  # Has a critical advisory, so the red badge shows up.
+  - name: minimist
+    version: 1.2.5
+    ecosystem: npm
+    advisory_type: github
+
+  # `github_repository` lists the advisories published in the repository itself.
+  # `repository_path` is required for it and takes the `owner/repo` form.
+  - name: express
+    version: 4.19.1
+    ecosystem: npm
+    advisory_type: github_repository
+    repository_path: expressjs/express
+
+  # `name` is optional for `github_repository`; the repository path is shown instead.
+  - version: 6.5.4
+    advisory_type: github_repository
     repository_path: indutny/elliptic
-output_format: json
+
+# text (default), json or yaml
+output_format: text
+# error, warn (default), info, debug or trace
+log_level: info
