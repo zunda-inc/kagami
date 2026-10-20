@@ -1,5 +1,6 @@
 use crate::advisory::{
-    Advisory, CvssScore, CvssSeverities, Epss, Package, Severity, TargetWithAdvisory, Vulnerability,
+    Advisory, CvssScore, CvssSeverities, Epss, Package, Severity, TargetWithAdvisory,
+    Vulnerability, make_severity_order,
 };
 use crate::error::KagamiError;
 use crate::{AdvisoryType, Target};
@@ -141,13 +142,18 @@ fn process_advisory_type_github(
         mapped_advisories.push(map_advisory(advisory));
     }
 
+    let severity_order = make_severity_order();
     Ok(TargetWithAdvisory {
         name: target.name.clone(),
         version: target.version.clone(),
         ecosystem: target.ecosystem.clone(),
         advisory_type: target.advisory_type,
         repository_path: target.repository_path.clone(),
-        advisories: mapped_advisories,
+        advisories: mapped_advisories
+            .iter()
+            .sorted_by(|a, b| severity_order[&a.severity].cmp(&severity_order[&b.severity]))
+            .map(|v| v.clone())
+            .collect(),
     })
 }
 
@@ -184,13 +190,18 @@ fn process_advisory_type_github_repository(
         mapped_advisories.push(map_repository_advisory(advisory)?);
     }
 
+    let severity_order = make_severity_order();
     Ok(TargetWithAdvisory {
         name: target.name.clone(),
         version: target.version.clone(),
         ecosystem: target.ecosystem.clone(),
         advisory_type: target.advisory_type,
         repository_path: target.repository_path.clone(),
-        advisories: mapped_advisories,
+        advisories: mapped_advisories
+            .iter()
+            .sorted_by(|a, b| severity_order[&a.severity].cmp(&severity_order[&b.severity]))
+            .map(|v| v.clone())
+            .collect(),
     })
 }
 

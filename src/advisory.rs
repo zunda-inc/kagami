@@ -1,6 +1,7 @@
 use crate::AdvisoryType;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct TargetWithAdvisory {
@@ -28,13 +29,25 @@ pub struct Advisory {
     pub vulnerabilities: Vec<Vulnerability>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, strum_macros::Display)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, strum_macros::Display,
+)]
 pub enum Severity {
     Unknown,
     Low,
     Medium,
     High,
     Critical,
+}
+
+pub fn make_severity_order() -> HashMap<Severity, i32> {
+    HashMap::from([
+        (Severity::Critical, 1),
+        (Severity::High, 2),
+        (Severity::Medium, 3),
+        (Severity::Low, 4),
+        (Severity::Unknown, 5),
+    ])
 }
 
 #[derive(Debug, Clone, Serialize)]
