@@ -21,13 +21,13 @@ pub fn output_to_stdout(
     Ok(())
 }
 
-fn output_text(results: &Vec<TargetWithAdvisory>) {
-    let target_count = results.len();
-    let critical_count = get_count_by_severity(&results, Severity::Critical);
-    let high_count = get_count_by_severity(&results, Severity::High);
-    let medium_count = get_count_by_severity(&results, Severity::Medium);
-    let low_count = get_count_by_severity(&results, Severity::Low);
-    let unknown_count = get_count_by_severity(&results, Severity::Unknown);
+fn output_text(targets: &Vec<TargetWithAdvisory>) {
+    let target_count = targets.len();
+    let critical_count = get_count_by_severity(&targets, Severity::Critical);
+    let high_count = get_count_by_severity(&targets, Severity::High);
+    let medium_count = get_count_by_severity(&targets, Severity::Medium);
+    let low_count = get_count_by_severity(&targets, Severity::Low);
+    let unknown_count = get_count_by_severity(&targets, Severity::Unknown);
     let total_count = critical_count + high_count + medium_count + low_count + unknown_count;
 
     println!(
@@ -44,7 +44,11 @@ fn output_text(results: &Vec<TargetWithAdvisory>) {
         style(low_count).bold(),
         style("Unknown").bold().white().bg(Color::Black),
         style(unknown_count).bold()
-    )
+    );
+
+    for target in targets {
+
+    }
 }
 
 fn get_count_by_severity(results: &Vec<TargetWithAdvisory>, severity: Severity) -> usize {
