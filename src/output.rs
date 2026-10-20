@@ -1,5 +1,6 @@
 use crate::OutputFormat;
 use crate::advisory::{Advisory, Severity, TargetWithAdvisory};
+use crate::error::KagamiError;
 use console::{Color, Term, style};
 use std::error::Error;
 
@@ -51,6 +52,7 @@ fn output_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), Box<dyn Error>> 
     )?;
 
     for target in targets {
+        // Target header
         print_console_divider(&stdout_terminal)?;
         stdout_terminal.write_line(
             format!(
@@ -72,6 +74,7 @@ fn output_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), Box<dyn Error>> 
         )?;
         print_console_divider(&stdout_terminal)?;
 
+        // Counts for target
         let critical_count =
             get_count_by_severity_for_advisories(&target.advisories, Severity::Critical);
         let high_count = get_count_by_severity_for_advisories(&target.advisories, Severity::High);
@@ -107,10 +110,13 @@ fn output_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), Box<dyn Error>> 
 fn print_console_divider(terminal: &Term) -> Result<(), Box<dyn Error>> {
     let (_, width) = terminal.size();
     let min_size = 100u16;
-    let write_width = [min_size, width]
-        .into_iter()
-        .min()
-        .expect("`write_width` must not be None.");
+    let write_width =
+        [min_size, width]
+            .into_iter()
+            .min()
+            .ok_or(Box::new(KagamiError::OptionalGuard(
+                "write_width".to_string(),
+            )))?;
     let divider_str = "━".repeat(usize::from(write_width));
     terminal.write_line(style(divider_str).cyan().to_string().as_str())?;
     Ok(())
