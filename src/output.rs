@@ -107,6 +107,17 @@ fn output_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
+fn styled_severity(severity: Severity) -> String {
+    match severity {
+        Severity::Unknown => style("Unknown").bold().white().bg(Color::Black),
+        Severity::Low => style("Low").bold().green(),
+        Severity::Medium => style("Medium").bold().yellow(),
+        Severity::High => style("High").bold().red(),
+        Severity::Critical => style("Critical").bold().white().bg(Color::Red),
+    }
+    .to_string()
+}
+
 fn print_console_divider(terminal: &Term) -> Result<(), Box<dyn Error>> {
     let (_, width) = terminal.size();
     let min_size = 100u16;
