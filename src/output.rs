@@ -1,9 +1,9 @@
 use crate::OutputFormat;
-use crate::advisory::{Advisory, Severity, TargetWithAdvisory};
+use crate::advisory::{Advisory, CvssScore, Epss, Severity, TargetWithAdvisory, Vulnerability};
 use crate::error::KagamiError;
+use chrono::{DateTime, Utc};
 use console::{Color, Term, style};
 use std::error::Error;
-use std::io::Write;
 
 pub fn output_to_stdout(
     output_format: &OutputFormat,
@@ -115,6 +115,7 @@ fn output_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), Box<dyn Error>> 
                 .as_str(),
             )?;
             // Detailed output
+            print_advisory_details(&stdout_terminal, advisory)?;
         }
     }
 
@@ -130,6 +131,141 @@ fn styled_severity(severity: Severity) -> String {
         Severity::Critical => style("Critical").bold().white().bg(Color::Red),
     }
     .to_string()
+}
+
+fn print_advisory_details(terminal: &Term, advisory: &Advisory) -> Result<(), Box<dyn Error>> {
+    let ids = match &advisory.cve_id {
+        Some(cve_id) => format!("{} / {}", advisory.ghsa_id, cve_id),
+        None => advisory.ghsa_id.clone(),
+    };
+
+    terminal.write_line(format!("{}{}", styled_detail_label("ID"), style(ids).bold()).as_str())?;
+    terminal.write_line(
+        format!(
+            "{}{}",
+            styled_detail_label("URL"),
+            style(&advisory.html_url).underlined()
+        )
+        .as_str(),
+    )?;
+    terminal.write_line(
+        format!(
+            "{}{}",
+            styled_detail_label("CVSS v3"),
+            styled_cvss_score(&advisory.cvss_severities.cvss_v3)
+        )
+        .as_str(),
+    )?;
+    terminal.write_line(
+        format!(
+            "{}{}",
+            styled_detail_label("CVSS v4"),
+            styled_cvss_score(&advisory.cvss_severities.cvss_v4)
+        )
+        .as_str(),
+    )?;
+    terminal.write_line(
+        format!(
+            "{}{}",
+            styled_detail_label("EPSS"),
+            styled_epss(advisory.epss)
+        )
+        .as_str(),
+    )?;
+    terminal.write_line(
+        format!(
+            "{}{} (updated {})",
+            styled_detail_label("Published"),
+            formatted_date(&advisory.published_at),
+            formatted_date(&advisory.updated_at)
+        )
+        .as_str(),
+    )?;
+    if let Some(withdrawn_at) = &advisory.withdrawn_at {
+        terminal.write_line(
+            format!(
+                "{}{}",
+                styled_detail_label("Withdrawn"),
+                style(formatted_date(withdrawn_at)).yellow().bold()
+            )
+            .as_str(),
+        )?;
+    }
+    for (index, vulnerability) in advisory.vulnerabilities.iter().enumerate() {
+        // Only the first affected package carries the label, the others line up under it.
+        let label = if index == 0 { "Affected" } else { "" };
+        terminal.write_line(
+            format!(
+                "{}{}",
+                styled_detail_label(label),
+                styled_vulnerability(vulnerability)
+            )
+            .as_str(),
+        )?;
+    }
+    terminal.write_line("")?;
+
+    Ok(())
+}
+
+fn styled_detail_label(label: &str) -> String {
+    let label_width = 11usize;
+    style(format!("{label:<label_width$}"))
+        .dim()
+        .to_string()
+}
+
+fn styled_cvss_score(cvss: &CvssScore) -> String {
+    // GitHub returns a 0.0 score without a vector string for a CVSS version it has not assessed.
+    let score = cvss.score.filter(|score| *score > 0.0);
+    match (score, &cvss.vector_string) {
+        (Some(score), Some(vector)) => format!(
+            "{} ({})",
+            style(format!("{score:.1}")).bold(),
+            style(vector).dim()
+        ),
+        (Some(score), None) => style(format!("{score:.1}")).bold().to_string(),
+        (None, Some(vector)) => style(vector).dim().to_string(),
+        (None, None) => style("N/A").dim().to_string(),
+    }
+}
+
+fn styled_epss(epss: Option<Epss>) -> String {
+    match epss {
+        // EPSS values are fractions, so both are shown as percentages.
+        Some(epss) => format!(
+            "{}% ({:.1}th percentile)",
+            style(format!("{:.3}", epss.percentage * 100.0)).bold(),
+            epss.percentile * 100.0
+        ),
+        None => style("N/A").dim().to_string(),
+    }
+}
+
+fn styled_vulnerability(vulnerability: &Vulnerability) -> String {
+    let package = format!(
+        "{}/{}",
+        vulnerability.package.ecosystem, vulnerability.package.name
+    );
+    let patched = if vulnerability.patched_versions.is_empty() {
+        style("no patched version").red().to_string()
+    } else {
+        format!(
+            "patched: {}",
+            style(vulnerability.patched_versions.join(", ")).green()
+        )
+    };
+
+    format!(
+        "{} {} ({})",
+        style(package).bold(),
+        vulnerability.vulnerable_version_range,
+        patched
+    )
+}
+
+fn formatted_date(date: &DateTime<Utc>) -> String {
+    date.format("%Y-%m-%d").to_string()
 }
 
 fn print_console_divider(terminal: &Term) -> Result<(), Box<dyn Error>> {
