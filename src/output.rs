@@ -24,7 +24,7 @@ pub fn output_to_stdout(
 }
 
 fn output_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), Box<dyn Error>> {
-    let stdout_terminal = console::Term::stdout();
+    let stdout_terminal = Term::stdout();
     let target_count = targets.len();
     let critical_count = get_count_by_severity_for_target(&targets, Severity::Critical);
     let high_count = get_count_by_severity_for_target(&targets, Severity::High);
@@ -210,9 +210,7 @@ fn print_advisory_details(terminal: &Term, advisory: &Advisory) -> Result<(), Bo
 
 fn styled_detail_label(label: &str) -> String {
     let label_width = 11usize;
-    style(format!("{label:<label_width$}"))
-        .dim()
-        .to_string()
+    style(format!("{label:<label_width$}")).dim().to_string()
 }
 
 fn styled_cvss_score(cvss: &CvssScore) -> String {
@@ -243,10 +241,16 @@ fn styled_epss(epss: Option<Epss>) -> String {
 }
 
 fn styled_vulnerability(vulnerability: &Vulnerability) -> String {
-    let package = format!(
-        "{}/{}",
-        vulnerability.package.ecosystem, vulnerability.package.name
-    );
+    // Repository advisories may leave the package or range empty, so only filled parts are shown.
+    let package = [
+        vulnerability.package.ecosystem.as_str(),
+        vulnerability.package.name.as_str(),
+    ]
+    .into_iter()
+    .filter(|part| !part.is_empty())
+    .collect::<Vec<_>>()
+    .join("/");
+
     let patched = if vulnerability.patched_versions.is_empty() {
         style("no patched version").red().to_string()
     } else {
@@ -256,12 +260,16 @@ fn styled_vulnerability(vulnerability: &Vulnerability) -> String {
         )
     };
 
-    format!(
-        "{} {} ({})",
-        style(package).bold(),
-        vulnerability.vulnerable_version_range,
-        patched
-    )
+    let mut parts: Vec<String> = vec![];
+    if !package.is_empty() {
+        parts.push(style(package).bold().to_string());
+    }
+    if !vulnerability.vulnerable_version_range.is_empty() {
+        parts.push(vulnerability.vulnerable_version_range.clone());
+    }
+    parts.push(format!("({patched})"));
+
+    parts.join(" ")
 }
 
 fn formatted_date(date: &DateTime<Utc>) -> String {

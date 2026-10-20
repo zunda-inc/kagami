@@ -28,6 +28,13 @@ targets:
     advisory_type: github_repository
     repository_path: indutny/elliptic
 
+  # Has many advisories whose ranges list the fix of every release branch, like `< 1.7.4, < 1.8.1`.
+  # The comma means AND, so only a version below the lowest fix matches them.
+  # Several of them have no CVE, and a few carry no package information at all.
+  - version: 1.7.3
+    advisory_type: github_repository
+    repository_path: envoyproxy/gateway
+
 # text (default), json or yaml
 output_format: text
 # error, warn (default), info, debug or trace
