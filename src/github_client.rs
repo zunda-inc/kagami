@@ -1,6 +1,7 @@
 use log::{debug, warn};
 use octocrab::Octocrab;
 use std::env;
+use std::error::Error;
 use tokio::process::Command;
 
 const ENV_GH_TOKEN: &str = "GH_TOKEN";
@@ -8,13 +9,13 @@ const ENV_GITHUB_TOKEN: &str = "GITHUB_TOKEN";
 const COMMAND_GH: &str = "gh";
 const COMMAND_GH_AUTH_TOKEN_ARGS: [&str; 2] = ["auth", "token"];
 
-async fn get_github_pat() -> Option<String> {
+async fn get_github_pat() -> Result<Option<String>, Box<dyn Error>> {
     // Check if it has environment variables
     let env_gh_token = env::var(ENV_GH_TOKEN);
     let env_github_token = env::var(ENV_GITHUB_TOKEN);
     if let Ok(env_token) = env_gh_token.or(env_github_token) {
         debug!("Found GH_TOKEN or GITHUB_TOKEN.");
-        return Some(env_token);
+        return Ok(Some(env_token));
     }
 
     // Check if it has gh command and has valid token from it
@@ -30,8 +31,11 @@ async fn get_github_pat() -> Option<String> {
             );
             ()
         }
-        return String::from_utf8(command_output.stdout).ok();
+        return Ok(Some(
+            String::from_utf8(command_output.stdout)?.trim().to_string(),
+        ));
     }
+
     if let Err(e) = command_result {
         warn!("Failed to run `gh auth token` command.");
         warn!("{}", e.to_string());
@@ -41,16 +45,16 @@ async fn get_github_pat() -> Option<String> {
     warn!(
         "Failed to retrieve GitHub PAT from your environment. It will call the API anonymously. Be careful for the API rate limiting!"
     );
-    None
+    Ok(None)
 }
 
-pub async fn init_octocrab() -> octocrab::Result<Octocrab> {
+pub async fn init_octocrab() -> Result<Octocrab, Box<dyn Error>> {
     let mut builder = Octocrab::builder();
 
-    let pat_result = get_github_pat().await;
+    let pat_result = get_github_pat().await?;
     if let Some(pat) = pat_result {
         builder = builder.personal_token(pat);
     }
 
-    builder.build()
+    Ok(builder.build()?)
 }
