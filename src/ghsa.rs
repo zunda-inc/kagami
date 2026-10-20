@@ -37,7 +37,7 @@ pub async fn find_vulnerabilities(
                 let page_result = query.send().await?;
                 let all_result = octocrab.all_pages(page_result).await?;
                 let mapped_results = process_advisory_type_github(&target, &all_result)?;
-                results.extend(mapped_results);
+                results.push(mapped_results);
             }
             AdvisoryType::GithubRepository => {
                 let repository_path = match target.extract_repository_path()? {
@@ -58,7 +58,7 @@ pub async fn find_vulnerabilities(
                     .await?;
                 let all_result = octocrab.all_pages(repo_adv_page).await?;
                 let mapped_results = process_advisory_type_github_repository(&target, &all_result)?;
-                results.extend(mapped_results);
+                results.push(mapped_results);
             }
         }
     }
@@ -69,8 +69,8 @@ pub async fn find_vulnerabilities(
 fn process_advisory_type_github(
     target: &Target,
     results: &Vec<gh::SecurityAdvisory>,
-) -> Result<Vec<TargetWithAdvisory>, Box<dyn Error>> {
-    let mut mapped_results: Vec<TargetWithAdvisory> = vec![];
+) -> Result<TargetWithAdvisory, Box<dyn Error>> {
+    let mut mapped_advisories: Vec<Advisory> = vec![];
 
     for advisory in results {
         let vulnerabilities = match &advisory.vulnerabilities {
@@ -82,24 +82,24 @@ fn process_advisory_type_github(
             continue;
         }
 
-        mapped_results.push(TargetWithAdvisory {
-            name: target.name.clone(),
-            version: target.version.clone(),
-            ecosystem: target.ecosystem.clone(),
-            advisory_type: target.advisory_type,
-            repository_path: target.repository_path.clone(),
-            advisories: vec![map_advisory(advisory)],
-        });
+        mapped_advisories.push(map_advisory(advisory));
     }
 
-    Ok(mapped_results)
+    Ok(TargetWithAdvisory {
+        name: target.name.clone(),
+        version: target.version.clone(),
+        ecosystem: target.ecosystem.clone(),
+        advisory_type: target.advisory_type,
+        repository_path: target.repository_path.clone(),
+        advisories: mapped_advisories,
+    })
 }
 
 fn process_advisory_type_github_repository(
     target: &Target,
     results: &Vec<gh::RepositoryAdvisory>,
-) -> Result<Vec<TargetWithAdvisory>, Box<dyn Error>> {
-    let mut mapped_results: Vec<TargetWithAdvisory> = vec![];
+) -> Result<TargetWithAdvisory, Box<dyn Error>> {
+    let mut mapped_advisories: Vec<Advisory> = vec![];
 
     for advisory in results {
         let vulnerabilities = match &advisory.vulnerabilities {
@@ -111,17 +111,17 @@ fn process_advisory_type_github_repository(
             continue;
         }
 
-        mapped_results.push(TargetWithAdvisory {
-            name: target.name.clone(),
-            version: target.version.clone(),
-            ecosystem: target.ecosystem.clone(),
-            advisory_type: target.advisory_type,
-            repository_path: target.repository_path.clone(),
-            advisories: vec![map_repository_advisory(advisory)?],
-        });
+        mapped_advisories.push(map_repository_advisory(advisory)?);
     }
 
-    Ok(mapped_results)
+    Ok(TargetWithAdvisory {
+        name: target.name.clone(),
+        version: target.version.clone(),
+        ecosystem: target.ecosystem.clone(),
+        advisory_type: target.advisory_type,
+        repository_path: target.repository_path.clone(),
+        advisories: mapped_advisories,
+    })
 }
 
 fn is_target_version_for_vulnerabilities(
