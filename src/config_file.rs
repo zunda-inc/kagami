@@ -108,7 +108,7 @@ impl Display for TargetParseError {
 
 impl Error for TargetParseError {}
 
-#[derive(PartialEq, Copy, Clone, Deserialize, Serialize, Debug)]
+#[derive(PartialEq, Copy, Clone, strum_macros::Display, Deserialize, Serialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum AdvisoryType {
     Github,
