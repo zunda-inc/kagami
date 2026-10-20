@@ -127,6 +127,7 @@ pub enum OutputFormat {
     Json,
     Yaml,
     Text,
+    SimpleMarkdownText,
 }
 
 #[derive(PartialEq, Copy, Clone, Deserialize, ValueEnum, Debug)]

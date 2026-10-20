@@ -28,7 +28,7 @@ pub struct Advisory {
     pub vulnerabilities: Vec<Vulnerability>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, strum_macros::Display)]
 pub enum Severity {
     Unknown,
     Low,

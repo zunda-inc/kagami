@@ -20,7 +20,68 @@ pub fn output_to_stdout(
             println!("{yaml}");
         }
         OutputFormat::Text => output_text(results)?,
+        OutputFormat::SimpleMarkdownText => output_simple_markdown_text(results)?,
     };
+    Ok(())
+}
+
+fn output_simple_markdown_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), Box<dyn Error>> {
+    let stdout_terminal = Term::stdout();
+    let not_vulnerable = targets
+        .iter()
+        .flat_map(|v| &v.advisories)
+        .collect::<Vec<_>>()
+        .is_empty();
+
+    if not_vulnerable {
+        stdout_terminal.write_line(":white_check_mark: There is no vulnerable targets!")?;
+        return Ok(());
+    }
+
+    let vulnerable_targets = targets
+        .iter()
+        .filter(|v| !v.advisories.is_empty())
+        .collect::<Vec<&TargetWithAdvisory>>();
+
+    stdout_terminal.write_line(
+        format!(
+            ":warning: *{}* vulnerable target(s) detected! :warning:",
+            vulnerable_targets.len()
+        )
+        .as_str(),
+    )?;
+
+    for target in vulnerable_targets {
+        stdout_terminal.write_line(
+            format!(
+                "`{}@{}`{}",
+                target
+                    .name
+                    .as_ref()
+                    .or(target.repository_path.as_ref())
+                    .unwrap_or(&"".to_string()),
+                target.version,
+                match &target.ecosystem {
+                    Some(ecosystem) => format!(" ({})", ecosystem),
+                    None => "".to_string(),
+                }
+            )
+            .as_str(),
+        )?;
+
+        for advisory in &target.advisories {
+            stdout_terminal.write_line(
+                format!(
+                    "{} [{}] {}",
+                    markdown_emoji_severity(advisory.severity),
+                    advisory.severity.to_string(),
+                    advisory.html_url
+                )
+                .as_str(),
+            )?;
+        }
+    }
+
     Ok(())
 }
 
@@ -130,6 +191,17 @@ fn styled_severity(severity: Severity) -> String {
         Severity::Medium => style("Medium").bold().yellow(),
         Severity::High => style("High").bold().red(),
         Severity::Critical => style("Critical").bold().white().bg(Color::Red),
+    }
+    .to_string()
+}
+
+fn markdown_emoji_severity(severity: Severity) -> String {
+    match severity {
+        Severity::Unknown => ":white_circle:",
+        Severity::Low => ":white_circle:",
+        Severity::Medium => ":orange_circle:",
+        Severity::High => ":red_circle:",
+        Severity::Critical => ":rotating_light:",
     }
     .to_string()
 }
