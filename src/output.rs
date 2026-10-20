@@ -45,7 +45,7 @@ fn output_simple_markdown_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), 
 
     stdout_terminal.write_line(
         format!(
-            ":warning: *{}* vulnerable target(s) detected! :warning:",
+            "⚠️ *{}* vulnerable target(s) detected! ⚠️",
             vulnerable_targets.len()
         )
         .as_str(),
