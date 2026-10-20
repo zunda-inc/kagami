@@ -9,11 +9,11 @@ use crate::{LogLevel, OutputFormat};
     long_about= None
 )]
 pub struct KagamiCommands {
-    /// Sets an output format. Default is `text`.
-    #[arg(short, long, value_enum)]
+    /// Sets an output format.
+    #[arg(short, long, value_enum, default_value = "text")]
     pub output_format: Option<OutputFormat>,
-    /// Sets a log level. Default is `warn`.
-    #[arg(short, long, value_enum)]
+    /// Sets a log level.
+    #[arg(short, long, value_enum, default_value = "warn")]
     pub log_level: Option<LogLevel>,
     /// Sets a path to the config file. Default is `kagami.yaml` in the current directory.
     #[arg(default_value = "kagami.yaml")]
