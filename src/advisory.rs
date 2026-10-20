@@ -1,7 +1,6 @@
 use crate::AdvisoryType;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct TargetWithAdvisory {
@@ -40,14 +39,17 @@ pub enum Severity {
     Critical,
 }
 
-pub fn make_severity_order() -> HashMap<Severity, i32> {
-    HashMap::from([
-        (Severity::Critical, 1),
-        (Severity::High, 2),
-        (Severity::Medium, 3),
-        (Severity::Low, 4),
-        (Severity::Unknown, 5),
-    ])
+impl Severity {
+    // Sort order of the severities, the most severe first.
+    pub const fn order(self) -> i32 {
+        match self {
+            Severity::Critical => 1,
+            Severity::High => 2,
+            Severity::Medium => 3,
+            Severity::Low => 4,
+            Severity::Unknown => 5,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
