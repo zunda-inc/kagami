@@ -34,7 +34,7 @@ fn output_simple_markdown_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), 
         .is_empty();
 
     if not_vulnerable {
-        stdout_terminal.write_line(":white_check_mark: There is no vulnerable targets!")?;
+        stdout_terminal.write_line("✅ There is no vulnerable targets!")?;
         return Ok(());
     }
 
