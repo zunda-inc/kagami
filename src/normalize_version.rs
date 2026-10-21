@@ -113,8 +113,14 @@ pub fn normalize_version_range(version_range: impl Into<String>) -> Result<Strin
             break;
         }
 
+        let elem_formatted = regex_split_include_match(elem, &compare_regex)
+            .iter()
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
         if split_by_space.len() < idx + 2 {
-            split_by_space_elements.push(elem.to_string());
+            split_by_space_elements.push(elem_formatted.to_string());
             continue;
         }
 
@@ -123,7 +129,13 @@ pub fn normalize_version_range(version_range: impl Into<String>) -> Result<Strin
         }
 
         let next_elem = &split_by_space[idx + 1];
-        let and_range = format!("{}, {}", elem, next_elem);
+        let next_elem_formatted = regex_split_include_match(next_elem, &compare_regex)
+            .iter()
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let and_range = format!("{}, {}", elem_formatted, next_elem_formatted);
 
         split_by_space_elements.push(and_range);
     }
