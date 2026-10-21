@@ -19,6 +19,15 @@ use itertools::Itertools;
 use regex::Regex;
 use semver::{Comparator, Op, Version, VersionReq};
 
+/// Rewrites a hand-written version range into the syntax `semver::VersionReq` accepts.
+///   `>= v1.19.0, < v1.19.6`                ->  `>= 1.19.0, < 1.19.6`
+///   `1.2.0 through 1.8.7`                  ->  `>= 1.2.0, <= 1.8.7`
+///   `>= 2.1.0 < 2.2.7,  >= 2.3.0 < 2.3.4`  ->  `>= 2.1.0, < 2.2.7 || >= 2.3.0, < 2.3.4`
+///   `< 1.8.4, < 1.9.1`                     ->  `>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`
+///   `v1.18.0,v1.18.1`                      ->  `= 1.18.0 || = 1.18.1`
+///   `All`                                  ->  `*`
+///   `>= 1.0.0, < 1.2.6`                    ->  `>= 1.0.0, < 1.2.6`  (already valid: unchanged)
+///   `NONE`                                 ->  `= NONE`  (still unparsable: the caller warns)
 pub fn normalize_version_range(range: impl Into<String>) -> String {
     let range = range.into();
     let original = range.clone();
@@ -54,14 +63,20 @@ pub fn normalize_version_range(range: impl Into<String>) -> String {
 
 // ----- the whole range -----
 
-// `>= 1.0.0, < 1.2.6 || = 2.0.0` parses when every alternative parses.
+// Whether `semver::VersionReq` accepts every alternative of the range as it is.
+//   `>= 1.0.0, < 1.2.6 || = 2.0.0`  ->  true
+//   `< 1.8.4, < 1.9.1`              ->  true
+//   `>= v1.0.0`                     ->  false
 fn parses(range: &str) -> bool {
     range
         .split("||")
         .all(|alternative| VersionReq::parse(alternative.trim()).is_ok())
 }
 
-// `>= 4.0 (32-bit only)` becomes `>= 4.0`.
+// Removes a note written in parentheses.
+//   `>= 4.0 (32-bit only)`           ->  `>= 4.0`
+//   `All versions (default config)`  ->  `All versions`
+//   `(confirmed on main @ e0f8d9b)`  ->  `` (nothing is left)
 fn drop_notes_in_parentheses(range: &str) -> String {
     let without_note = match (range.find('('), range.rfind(')')) {
         (Some(open), Some(close)) if open < close => {
@@ -73,20 +88,29 @@ fn drop_notes_in_parentheses(range: &str) -> String {
     without_note.trim().to_string()
 }
 
-// `v1.19.0` and `V1.19.0` become `1.19.0`. The `v` of `dev1` stays, it is inside a word.
+// Removes the `v` or `V` written in front of a version.
+//   `>= v1.19.0, < V1.19.6`  ->  `>= 1.19.0, < 1.19.6`
+//   `v2.9.3+6eba5be`         ->  `2.9.3+6eba5be`
+//   `>= 1.0.0-dev1`          ->  `>= 1.0.0-dev1`  (the `v` of `dev1` is inside a word)
 fn drop_v_prefixes(range: &str) -> String {
     let v_before_digit = Regex::new(r"\b[vV](\d)").expect("the pattern is a constant");
     v_before_digit.replace_all(range, "$1").to_string()
 }
 
-// `All`, `all` and `All versions` mean every version.
+// Whether the range is a way of saying "every version".
+//   `All`                        ->  true
+//   `all versions`               ->  true
+//   `All versions prior to 1.7`  ->  false
 fn is_every_version(range: &str) -> bool {
     let lowercase = range.trim().to_ascii_lowercase();
     lowercase == "all" || lowercase == "all versions"
 }
 
-// `1.14.2, 1.13.2 and 1.12.4` with `<=` -> `<= 1.14.2, <= 1.13.2, <= 1.12.4`.
-// `repeated_phrase` is removed everywhere first, for `7.2.10 and below, 8.0.5 and below`.
+// Puts the same operator in front of every version of a list. A phrase that was repeated after
+// each version is removed first.
+//   (`1.14.2, 1.13.2 and 1.12.4`, `<=`, ``)                   ->  `<= 1.14.2, <= 1.13.2, <= 1.12.4`
+//   (`7.2.10 and below, 8.0.5 and below`, `<=`, `and below`)  ->  `<= 7.2.10, <= 8.0.5`
+//   (`1.7.14 and 1.8.7`, `<`, ``)                             ->  `< 1.7.14, < 1.8.7`
 pub fn bound_every_version(versions: &str, operator: &str, repeated_phrase: &str) -> String {
     let versions = if repeated_phrase.is_empty() {
         versions.to_string()
@@ -102,7 +126,12 @@ pub fn bound_every_version(versions: &str, operator: &str, repeated_phrase: &str
         .join(", ")
 }
 
-// `2.2.0 <= V <= 2.10.1` -> `>= 2.2.0, <= 2.10.1` and `1.22 < 1.27.1` -> `>= 1.22, < 1.27.1`.
+// Reads a range written like a mathematical interval.
+//   `2.2.0 <= V <= 2.10.1`          ->  Some(`>= 2.2.0, <= 2.10.1`)
+//   `2.0.0 < version <= 2.7.1`      ->  Some(`> 2.0.0, <= 2.7.1`)
+//   `1.22 < 1.27.1`                 ->  Some(`>= 1.22, < 1.27.1`)
+//   `>= 1.0.0, < 1.2.6`             ->  None
+//   `16.0.0, <= 15.0.1, <= 13.1.2`  ->  None  (the middle word is a version, not a variable)
 pub fn interval_to_requirement(range: &str) -> Option<String> {
     let words = range.split_whitespace().collect::<Vec<_>>();
 
@@ -136,9 +165,15 @@ pub fn interval_to_requirement(range: &str) -> Option<String> {
 
 // ----- one alternative (the parts between `||`) -----
 
-// Comma-separated items are the comparators of one requirement, like `>= 1.0.0, < 1.2.6`, unless an
-// item is a requirement by itself: a hyphen range, a `>= a < b` pair or an exact version. Then the
-// items are alternatives, like `3.0.0-rc1 - 3.2.0-rc1, 3.1.7` -> `>= 3.0.0-rc1, <= 3.2.0-rc1 || = 3.1.7`.
+// Rebuilds one alternative (the text between two `||`). Comma-separated items are the comparators
+// of one requirement, unless an item is a requirement by itself (a hyphen range, a `>= a < b` pair
+// or an exact version); then the items are alternatives. A word without a digit next to real items
+// is a label and is dropped.
+//   `>= 1.0.0, < 1.2.6`                                    ->  `>= 1.0.0, < 1.2.6`
+//   `>= 2.1.0 < 2.2.7, >= 2.3.0 < 2.3.4`                   ->  `>= 2.1.0, < 2.2.7 || >= 2.3.0, < 2.3.4`
+//   `3.0.0-rc1 - 3.2.0-rc1, 3.1.7`                         ->  `>= 3.0.0-rc1, <= 3.2.0-rc1 || = 3.1.7`
+//   `stable <= 2.7.10, beta, tests-passed <= 2.8.0.beta8`  ->  `<= 2.7.10, <= 2.8.0-beta8`
+//   `< 1.8.4, < 1.9.1`                                     ->  `>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`
 fn normalize_alternative(alternative: &str) -> String {
     let items = alternative
         .split(',')
@@ -169,10 +204,12 @@ fn normalize_alternative(alternative: &str) -> String {
         .join(" || ")
 }
 
-// `stable <= 2.8.13` -> ["<= 2.8.13"]
-// `3.2.0 - 3.3.8` -> [">= 3.2.0", "<= 3.3.8"]
-// `>= 2.1.0 < 2.2.7` -> [">= 2.1.0", "< 2.2.7"]
-// `2.9.3+6eba5be` -> ["= 2.9.3"]
+// Turns one comma-separated item into its comparators, each written as `operator version`.
+//   `stable <= 2.8.13`  ->  [`<= 2.8.13`]
+//   `3.2.0 - 3.3.8`     ->  [`>= 3.2.0`, `<= 3.3.8`]
+//   `>= 2.1.0 < 2.2.7`  ->  [`>= 2.1.0`, `< 2.2.7`]
+//   `2.9.3+6eba5be`     ->  [`= 2.9.3`]
+//   `<=4.1.135.Final`   ->  [`<= 4.1.135`]
 fn item_to_comparators(item: &str) -> Vec<String> {
     let item = drop_label(item);
 
@@ -195,8 +232,13 @@ fn item_to_comparators(item: &str) -> Vec<String> {
         .collect()
 }
 
-// `stable <= 2.8.13` -> `<= 2.8.13`, `and 3.4.1` -> `3.4.1`: words in front of the first operator or
-// version go, as long as they are separate words (the `edge-` of `edge-24.6.2` stays).
+// Removes the words written in front of a comparator or version, like a release channel or a
+// product name. The words must stand on their own: `edge-24.6.2` keeps its `edge-`.
+//   `stable <= 2.8.13`    ->  `<= 2.8.13`
+//   `jaeger-ui < 1.31.0`  ->  `< 1.31.0`
+//   `and 3.4.1`           ->  `3.4.1`
+//   `edge-24.6.2`         ->  `edge-24.6.2`
+//   `1.3.x <= 1.3.17`     ->  `1.3.x <= 1.3.17`  (the label contains a digit)
 fn drop_label(item: &str) -> String {
     let start = item
         .find(|c: char| c.is_ascii_digit() || is_operator_char(c))
@@ -211,8 +253,11 @@ fn drop_label(item: &str) -> String {
     }
 }
 
-// `>= 2.1.0 < 2.2.7` -> [">= 2.1.0", "< 2.2.7"], a bare `3.1.7` -> ["3.1.7"].
-// A new piece starts wherever an operator starts.
+// Cuts an item into pieces, a new piece starting wherever an operator starts.
+//   `>= 2.1.0 < 2.2.7`  ->  [`>= 2.1.0`, `< 2.2.7`]
+//   `>=9.2.0 <9.2.10`   ->  [`>=9.2.0`, `<9.2.10`]
+//   `<=4.1.135.Final`   ->  [`<=4.1.135.Final`]
+//   `3.1.7`             ->  [`3.1.7`]
 fn split_at_operators(item: &str) -> Vec<String> {
     let mut pieces: Vec<String> = vec![];
     let mut previous_is_operator = true;
@@ -231,7 +276,11 @@ fn split_at_operators(item: &str) -> Vec<String> {
         .collect()
 }
 
-// `<=4.1.135.Final` -> `<= 4.1.135`, `3.1.7` -> `= 3.1.7`, `2.9.3+6eba5be` -> `= 2.9.3`.
+// Writes one piece as `operator version` with the version fixed; a bare version becomes exact.
+//   `<=4.1.135.Final`  ->  `<= 4.1.135`
+//   `>= 19.03.15`      ->  `>= 19.3.15`
+//   `3.1.7`            ->  `= 3.1.7`
+//   `2.9.3+6eba5be`    ->  `= 2.9.3`
 fn format_comparator(piece: &str) -> String {
     let operator_end = piece
         .find(|c: char| !is_operator_char(c))
@@ -245,15 +294,23 @@ fn format_comparator(piece: &str) -> String {
     }
 }
 
+// Whether the character can be part of an operator.
+//   `<`, `>`, `=`, `~`, `^`  ->  true
+//   `-`, `|`, `1`, ` `       ->  false
 fn is_operator_char(c: char) -> bool {
     matches!(c, '<' | '>' | '=' | '~' | '^')
 }
 
 // ----- one version -----
 
-// `4.1.135.Final` -> `4.1.135`, `3.0.0.beta15` -> `3.0.0-beta15`, `0.23.0rc2` -> `0.23.0-rc2`,
-// `19.03.15` -> `19.3.15`. Anything else, such as a fourth number or a `v20210219` build stamp,
-// is left as it is.
+// Rewrites a version that semver does not accept but whose meaning is clear.
+//   `4.1.135.Final`     ->  `4.1.135`      (Maven's release qualifier is dropped)
+//   `3.0.0.beta15`      ->  `3.0.0-beta15`  (a word after the patch number is a pre-release)
+//   `0.23.0rc2`         ->  `0.23.0-rc2`
+//   `19.03.15`          ->  `19.3.15`
+//   `23.7.6.111`        ->  `23.7.6.111`  (a fourth number has no semver meaning: left alone)
+//   `9.4.37.v20210219`  ->  `9.4.37.v20210219`  (a build stamp is not a pre-release: left alone)
+//   `1.0.0-rc.1`        ->  `1.0.0-rc.1`
 fn fix_version(version: &str) -> String {
     let version = drop_leading_zeros(version);
     let parts: Vec<&str> = version.split('.').collect();
@@ -288,7 +345,10 @@ fn fix_version(version: &str) -> String {
     version.to_string()
 }
 
-// `19.03.15` -> `19.3.15`: semver does not allow a leading zero in a number. `030.0` -> `30.0`.
+// Removes the leading zeros semver does not allow in a number.
+//   `19.03.15`  ->  `19.3.15`
+//   `030.0`     ->  `30.0`
+//   `1.0.0`     ->  `1.0.0`
 fn drop_leading_zeros(version: &str) -> String {
     version
         .split('.')
@@ -310,14 +370,20 @@ fn drop_leading_zeros(version: &str) -> String {
         .join(".")
 }
 
-// `v20210219` is a build stamp, not a pre-release.
+// Whether a qualifier is a build stamp like Jetty's `v20210219` rather than a pre-release name.
+//   `v20210219`  ->  true
+//   `beta15`     ->  false
+//   `Final`      ->  false
 fn is_build_stamp(qualifier: &str) -> bool {
     qualifier.len() > 1
         && qualifier.starts_with('v')
         && qualifier[1..].chars().all(|c| c.is_ascii_digit())
 }
 
-// `2.9.3+6eba5be` -> `2.9.3`: a requirement cannot carry build metadata.
+// Writes a version without its build metadata, which a requirement cannot carry.
+//   `2.9.3+6eba5be`  ->  `2.9.3`
+//   `3.0.0-rc1`      ->  `3.0.0-rc1`
+//   `2.4.0-rc*`      ->  `2.4.0-rc*`  (not a version: left alone)
 fn exact_version(version: &str) -> String {
     match Version::parse(version) {
         Ok(parsed) => {
@@ -333,8 +399,12 @@ fn exact_version(version: &str) -> String {
 
 // ----- release branches -----
 
-// `>= 2.1.0, < 2.2.7, >= 2.3.0, < 2.3.4` describes two release branches: a new one starts at every
-// lower bound, so it becomes `>= 2.1.0, < 2.2.7 || >= 2.3.0, < 2.3.4`.
+// Joins comparators into requirements. A lower bound starts a new release branch, and a list of
+// upper bounds only is read as one branch per upper bound.
+//   [`>= 1.0.0`, `< 1.2.6`]                         ->  `>= 1.0.0, < 1.2.6`
+//   [`>= 2.1.0`, `< 2.2.7`, `>= 2.3.0`, `< 2.3.4`]  ->  `>= 2.1.0, < 2.2.7 || >= 2.3.0, < 2.3.4`
+//   [`< 3.5.3`, `>= 3.6.0`, `< 3.11.3`]             ->  `< 3.5.3 || >= 3.6.0, < 3.11.3`
+//   [`< 1.8.4`, `< 1.9.1`]                          ->  `>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`
 fn group_into_branches(comparators: Vec<String>) -> String {
     let mut branches: Vec<Vec<String>> = vec![];
 
@@ -355,8 +425,11 @@ fn group_into_branches(comparators: Vec<String>) -> String {
         .join(" || ")
 }
 
-// A range that already parses is returned unchanged, unless an alternative is a list of upper bounds
-// like `< 1.8.4, < 1.9.1`.
+// For a range that already parses: returns it unchanged, except that a list of upper bounds is
+// read as release branches.
+//   `>= 1.0.0, < 1.2.6`            ->  `>= 1.0.0, < 1.2.6`
+//   `< 1.8.4, < 1.9.1`             ->  `>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`
+//   `< 1.0.0 || < 1.8.4, < 1.9.1`  ->  `< 1.0.0 || >= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`
 fn upper_bound_lists_to_branches(range: &str) -> String {
     let alternatives = range.split("||").map(str::trim).collect::<Vec<_>>();
     let has_upper_bound_list = alternatives
@@ -375,9 +448,15 @@ fn upper_bound_lists_to_branches(range: &str) -> String {
         .join(" || ")
 }
 
-// `< 1.8.4, < 1.9.1` lists the fix of two release branches as upper bounds only. Read literally the
-// comma is AND, which drops the 1.9 branch, so each upper bound gets its branch as lower bound:
-// `>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`. Returns None when the requirement is not such a list.
+// Reads a requirement made of upper bounds only, like `< 1.8.4, < 1.9.1`, as the fix of several
+// release branches. Literally the comma is AND, which would drop the 1.9 branch, so every upper
+// bound gets its own branch as lower bound. Returns None for any other requirement.
+//   `< 1.8.4, < 1.9.1`         ->  Some(`>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`)
+//   `<= 4.2.12, <= 4.1.132`    ->  Some(`>= 4.2.0, <= 4.2.12 || >= 4.1.0, <= 4.1.132`)
+//   `<8.4.26`                  ->  None  (one bound is kept literal)
+//   `< 1.8.4, < 1.8.9`         ->  None  (same branch twice)
+//   `<= 1.4.0-rc.2, <= 1.3.5`  ->  None  (pre-release)
+//   `>= 1.0.0, < 1.2.6`        ->  None  (has a lower bound)
 fn upper_bounds_to_branches(requirement: &str) -> Option<String> {
     let parsed = VersionReq::parse(requirement).ok()?;
     let comparators = &parsed.comparators;
@@ -405,7 +484,9 @@ fn upper_bounds_to_branches(requirement: &str) -> Option<String> {
     Some(comparators.iter().map(upper_bound_to_branch).join(" || "))
 }
 
-// `< 1.8.4` -> `>= 1.8.0, < 1.8.4`
+// Gives an upper bound the start of its release branch as lower bound.
+//   `< 1.8.4`    ->  `>= 1.8.0, < 1.8.4`
+//   `<= 4.2.12`  ->  `>= 4.2.0, <= 4.2.12`
 fn upper_bound_to_branch(comparator: &Comparator) -> String {
     let operator = if comparator.op == Op::LessEq {
         "<="
