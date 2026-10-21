@@ -28,7 +28,7 @@ pub fn normalize_version_range(version_range: impl Into<String>) -> Result<Strin
     let comma_count = version_range.matches(",").count();
     let hyphen_count = version_range.matches(" - ").count();
     let is_hyphen_range_pattern =
-        hyphen_count == if comma_count == 0 { 0 } else { comma_count - 1 } || hyphen_count == 1;
+        hyphen_count == if comma_count == 0 { 0 } else { comma_count + 1 } || hyphen_count == 1;
     if is_hyphen_range_pattern {
         let range_items = version_range
             .split(",")
