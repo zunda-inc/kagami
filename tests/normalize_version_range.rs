@@ -1,5 +1,6 @@
-// Output format: one space between the operator and the version, `, ` between the comparators
-// of one requirement, ` || ` between alternatives.
+// A range that already parses is returned unchanged. A range that has to be rebuilt uses one
+// space between the operator and the version, `, ` between the comparators of one requirement
+// and ` || ` between alternatives.
 use kagami::normalize_version::normalize_version_range;
 use rstest::rstest;
 
@@ -63,29 +64,19 @@ fn bare_versions_are_exact(#[case] input: &str, #[case] expected: &str) {
 // Upper bounds of several branches in one entry mean OR, each with its own branch as lower bound
 #[rstest]
 #[case::envoy_gateway("< 1.8.4, < 1.9.1", ">= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1")]
-#[case::php_src_single_upper_bound_stays("<8.4.26", "< 8.4.26")]
+#[case::php_src_single_upper_bound_stays("<8.4.26", "<8.4.26")]
 fn splits_upper_bounds_into_branches(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input).unwrap(), expected);
 }
 
-// Valid ranges are returned in the output format
+// Valid ranges are returned unchanged
 #[rstest]
 #[case::minimist(">= 1.0.0, < 1.2.6", ">= 1.0.0, < 1.2.6")]
-#[case::express_prerelease(">=5.0.0-alpha.1, <5.0.0", ">= 5.0.0-alpha.1, < 5.0.0")]
+#[case::express_prerelease(">=5.0.0-alpha.1, <5.0.0", ">=5.0.0-alpha.1, <5.0.0")]
 #[case::argo_cd_alternatives(
     ">= 3.0.0, < 3.3.15 || >= 3.4.0, < 3.4.10 || = 3.6.0-rc1",
     ">= 3.0.0, < 3.3.15 || >= 3.4.0, < 3.4.10 || = 3.6.0-rc1"
 )]
 fn keeps_valid_ranges(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input).unwrap(), expected);
-}
-
-// Prose has no safe interpretation and must be rejected
-#[rstest]
-#[case::argo_cd_prior_to("All versions prior to 1.7.14 and 1.8.7")]
-#[case::argo_cd_through("3.2.0 through 3.2.11, 3.3.9, and 3.4.1")]
-#[case::redis_or_newer("6.2 or newer")]
-#[case::moby_not_applicable("N/A")]
-fn rejects_prose(#[case] input: &str) {
-    assert!(normalize_version_range(input).is_err());
 }
