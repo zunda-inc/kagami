@@ -102,6 +102,40 @@ pub fn normalize_version_range(version_range: impl Into<String>) -> Result<Strin
         return Ok(missing_or_pattern);
     }
 
+    // ただスペースで区切られているが、色々とおかしいやつ
+    let split_by_space = version_range
+        .split(" ")
+        .map(|v| v.trim().to_string())
+        .collect::<Vec<_>>();
+    let mut split_by_space_elements: Vec<String> = vec![];
+    for (idx, elem) in split_by_space.iter().enumerate() {
+        if idx == split_by_space.len() - 1 {
+            break;
+        }
+
+        if split_by_space.len() < idx + 2 {
+            split_by_space_elements.push(elem.to_string());
+            continue;
+        }
+
+        if idx % 2 != 0 {
+            continue;
+        }
+
+        let next_elem = &split_by_space[idx + 1];
+        let and_range = format!("{}, {}", elem, next_elem);
+
+        split_by_space_elements.push(and_range);
+    }
+    let missing_commas_normalized = split_by_space_elements.join(" || ");
+    if !split_by_space_elements.is_empty()
+        && split_by_space_elements
+            .iter()
+            .all(|v| VersionReq::parse(v).is_ok())
+    {
+        return Ok(missing_commas_normalized);
+    }
+
     Ok(version_range)
 }
 
