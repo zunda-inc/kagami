@@ -211,10 +211,11 @@ fn process_advisory_type_github_repository(
 }
 
 fn is_target_version_for_vulnerabilities(
-    advisory_id: &str,
+    advisory_id: impl Into<String>,
     target_version: impl Into<String>,
     vulnerabilities: &Vec<octocrab::models::security_advisories::Vulnerability>,
 ) -> bool {
+    let advisory_id: String = advisory_id.into();
     let target_version: String = target_version.into();
 
     vulnerabilities.iter().any(|v| {
