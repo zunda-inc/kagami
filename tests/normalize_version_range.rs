@@ -69,14 +69,46 @@ fn splits_upper_bounds_into_branches(#[case] input: &str, #[case] expected: &str
     assert_eq!(normalize_version_range(input).unwrap(), expected);
 }
 
-// Valid ranges are returned unchanged
+// Regression: ranges that already parse must come back unchanged. Taken from real advisories.
 #[rstest]
-#[case::minimist(">= 1.0.0, < 1.2.6", ">= 1.0.0, < 1.2.6")]
-#[case::express_prerelease(">=5.0.0-alpha.1, <5.0.0", ">=5.0.0-alpha.1, <5.0.0")]
+// GitHub's curated database
+#[case::lodash_lower_and_upper(">= 4.0.0, <= 4.17.23")]
+#[case::lodash_upper_inclusive("<= 4.17.23")]
+#[case::lodash_upper_exclusive("< 4.17.21")]
+#[case::minimist(">= 1.0.0, < 1.2.6")]
+#[case::minimist_old_branch("< 0.2.4")]
+#[case::kubernetes_single("< 1.32.10")]
+#[case::kubernetes_prerelease_lower(">= 1.33.0-alpha.0, < 1.33.6")]
+#[case::kubernetes_inclusive("<= 1.32.3")]
+#[case::ingress_nginx(">= 1.14.0, < 1.14.3")]
+#[case::runc_prerelease_both(">= 1.5.0-rc.1, <= 1.5.0-rc.2")]
+#[case::runc_prerelease_without_dot(">= 1.0.0-rc3, <= 1.2.7")]
+#[case::moby_two_digit_major("<= 28.5.2")]
+#[case::moby_prerelease_upper("< 2.0.0-beta.14")]
+#[case::containerd_exact("= 2.4.0")]
+#[case::argo_cd_open_ended(">= 2.1.0")]
 #[case::argo_cd_alternatives(
-    ">= 3.0.0, < 3.3.15 || >= 3.4.0, < 3.4.10 || = 3.6.0-rc1",
-    ">= 3.0.0, < 3.3.15 || >= 3.4.0, < 3.4.10 || = 3.6.0-rc1"
+    ">= 3.0.0, < 3.3.15 || >= 3.4.0, < 3.4.10 || >= 3.5.0, < 3.5.4 || = 3.6.0-rc1"
 )]
-fn keeps_valid_ranges(#[case] input: &str, #[case] expected: &str) {
-    assert_eq!(normalize_version_range(input).unwrap(), expected);
+// Repository advisories that were already clean
+#[case::express_no_spaces("<4.22.0")]
+#[case::express_prerelease(">=5.0.0-alpha.1, <5.0.0")]
+#[case::express_prerelease_both(">=5.0.0-alpha.1, <5.0.0-beta.3")]
+#[case::elliptic_no_spaces("<=6.6.0")]
+#[case::php_src_no_spaces("<8.2.34")]
+#[case::php_src_with_space("< 8.2.32")]
+#[case::cilium(">= 1.19.0, < 1.19.3")]
+#[case::redis_open_ended(">= 7.0.0")]
+#[case::redis_partial_version(">= 7.2")]
+// Shapes semver accepts that no advisory happened to use
+#[case::wildcard("*")]
+#[case::caret("^1.2.3")]
+#[case::tilde("~1.2")]
+#[case::prerelease_tag_containing_v(">= 1.0.0-preview.1, < 1.0.0")]
+// Upper bound pairs that are not branch lists
+#[case::same_branch_twice("< 1.8.4, < 1.8.9")]
+#[case::partial_version_upper_bounds("< 7.2, < 8.0.1")]
+#[case::prerelease_upper_bounds("<= 1.4.0-rc.2, <= 1.3.5")]
+fn keeps_valid_ranges(#[case] range: &str) {
+    assert_eq!(normalize_version_range(range).unwrap(), range);
 }
