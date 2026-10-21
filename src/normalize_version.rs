@@ -1,7 +1,7 @@
 use crate::error::KagamiError;
 use itertools::Itertools;
 use regex::Regex;
-use semver::{Comparator, Op, VersionReq};
+use semver::{Comparator, Op, Version, VersionReq};
 use std::error::Error;
 
 pub fn normalize_version_range(version_range: impl Into<String>) -> Result<String, Box<dyn Error>> {
@@ -28,10 +28,19 @@ pub fn normalize_version_range(version_range: impl Into<String>) -> Result<Strin
     }
 
     // Should not include v before the version.
-    let front_v_regex = Regex::new(r"v(\d+)\.")?;
+    let front_v_regex = Regex::new(r"\bv(\d+)\.")?;
     version_range = front_v_regex
-        .replace_all(version_range.as_str(), "$1")
+        .replace_all(version_range.as_str(), "$1.")
         .to_string();
+
+    // `version, version` pattern: a bare version is an exact version, and a list of them means OR.
+    let bare_versions = version_range
+        .split(",")
+        .map(|v| Version::parse(v.trim()))
+        .collect::<Result<Vec<_>, _>>();
+    if let Ok(bare_versions) = bare_versions {
+        version_range = bare_versions.iter().map(to_exact_version).join(" || ");
+    }
 
     // Check if it can parse at this point
     if VersionReq::parse(&version_range).is_ok() {
@@ -41,8 +50,7 @@ pub fn normalize_version_range(version_range: impl Into<String>) -> Result<Strin
     // `version - version, version - version` pattern
     let comma_count = version_range.matches(",").count();
     let hyphen_count = version_range.matches(" - ").count();
-    let is_hyphen_range_pattern =
-        hyphen_count == if comma_count == 0 { 0 } else { comma_count + 1 } || hyphen_count == 1;
+    let is_hyphen_range_pattern = hyphen_count >= 1 && hyphen_count == comma_count + 1;
     if is_hyphen_range_pattern {
         let range_items = version_range
             .split(",")
@@ -92,4 +100,13 @@ fn to_branch(comparator: &Comparator) -> String {
         ">= {major}.{minor}.0, {op} {major}.{minor}.{}",
         comparator.patch.unwrap()
     )
+}
+
+// `2.9.3+6eba5be` becomes `= 2.9.3`: the build metadata is dropped because a requirement cannot carry it.
+fn to_exact_version(version: &Version) -> String {
+    let mut exact_version = format!("= {}.{}.{}", version.major, version.minor, version.patch);
+    if !version.pre.is_empty() {
+        exact_version = format!("{exact_version}-{}", version.pre);
+    }
+    exact_version
 }
