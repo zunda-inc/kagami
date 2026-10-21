@@ -6,6 +6,13 @@ use std::error::Error;
 pub fn normalize_version_range(version_range: impl Into<String>) -> Result<String, Box<dyn Error>> {
     let mut version_range: String = version_range.into();
 
+    if version_range.trim() == "All" {
+        return Ok("*".to_string());
+    }
+    if version_range.trim() == "All versions" {
+        return Ok("*".to_string());
+    }
+
     // Should not include v before the version.
     let front_v_regex = Regex::new(r"v(\d+)\.")?;
     version_range = front_v_regex
@@ -18,8 +25,9 @@ pub fn normalize_version_range(version_range: impl Into<String>) -> Result<Strin
     }
 
     // `version - version, version - version` pattern
+    let comma_count = version_range.matches(",").count();
     let is_hyphen_range_pattern =
-        version_range.matches(" - ").count() == version_range.matches(",").count() - 1;
+        version_range.matches(" - ").count() == if comma_count == 0 { 0 } else { comma_count - 1 };
     if is_hyphen_range_pattern {
         let range_items = version_range
             .split(",")

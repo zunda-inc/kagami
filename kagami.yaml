@@ -1,64 +1,30 @@
-# Test configuration for kagami.
-#
-# kagami is for the software that no package manager audits for you: runtimes installed
-# directly on servers, container engines on hosts, and the controllers pinned by image tag in
-# Kubernetes manifests. Every target below is pinned to a version that is known to have
-# published advisories, so a run prints at least one advisory for each of them.
 targets:
-  # ----- Installed directly on hosts -----
-
-  # `github_repository` lists the advisories a project publishes in its own repository.
-  # `repository_path` is required for it and takes the `owner/repo` form; `name` is optional
-  # and the repository path is shown instead.
-  # php-src writes the fix of every release branch as its own `< X.Y.Z` entry without a lower
-  # bound, so a version on an older branch also matches the entries of the newer branches
-  # (a fully patched 8.3 still matches every `< 8.4.x` entry). Pin the newest branch you run,
-  # or read the ranges in the output before acting on them.
-  # One old advisory (GHSA-w8qr-v226-r27w) uses ranges like `7.3.27 - 7.3.33` that are not
-  # semver; kagami warns about it and treats that range as not affecting the target.
   - version: 8.5.9
     advisory_type: github_repository
     repository_path: php/php-src
 
-  # `github` searches GitHub's curated advisory database by package name. Its version ranges
-  # are normalized, so prefer it whenever the software is listed there, even if you do not
-  # consume it as a Go module. Docker Engine is tracked under its Go module path.
   - name: github.com/moby/moby
     version: 26.1.4
     ecosystem: go
     advisory_type: github
 
-  # ----- Pinned in Kubernetes manifests -----
-
-  # The cluster itself (kubelet, kube-apiserver, kube-controller-manager, ...).
   - name: k8s.io/kubernetes
     version: 1.29.0
     ecosystem: go
     advisory_type: github
 
-  # The ingress-nginx controller image. 1.11.4 predates the IngressNightmare fixes (1.11.5),
-  # so a critical advisory shows up.
   - name: k8s.io/ingress-nginx
     version: 1.11.4
     ecosystem: go
     advisory_type: github
 
-  # Argo CD. Its own repository advisories use free-text ranges like `2.6.0 through 2.11.3`,
-  # which cannot be parsed, so the curated database is the usable source for it.
   - name: github.com/argoproj/argo-cd/v2
     version: 2.14.5
     ecosystem: go
     advisory_type: github
 
-  # Envoy Gateway publishes clean ranges in its repository, but lists the fix of every release
-  # branch in one entry, like `< 1.8.4, < 1.9.1`. The comma means AND, so only a version below
-  # the lowest fix matches them. Several of its advisories have no CVE, and a few carry no
-  # package information at all.
   - version: 1.8.3
     advisory_type: github_repository
     repository_path: envoyproxy/gateway
-
-# text (default), json or yaml
 output_format: text
-# error, warn (default), info, debug or trace
 log_level: info
