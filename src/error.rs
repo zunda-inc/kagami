@@ -4,6 +4,7 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug)]
 pub enum KagamiError {
     OptionalGuard(String),
+    VersionRangeInconsistent(String),
 }
 
 impl Display for KagamiError {
@@ -11,6 +12,9 @@ impl Display for KagamiError {
         match self {
             KagamiError::OptionalGuard(s) => {
                 write!(f, "`{}` must not be None value.", s)
+            }
+            KagamiError::VersionRangeInconsistent(s) => {
+                write!(f, "`{}` is unexpected version range.", s)
             }
         }
     }
