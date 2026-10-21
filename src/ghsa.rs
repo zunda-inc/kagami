@@ -4,7 +4,7 @@ use crate::advisory::{
 use crate::error::KagamiError;
 use crate::{AdvisoryType, Target};
 use itertools::Itertools;
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 use octocrab::Octocrab;
 use octocrab::models::security_advisories as gh;
 use semver::{Version, VersionReq};
@@ -126,7 +126,11 @@ fn process_advisory_type_github(
             }
         };
 
-        if !is_target_version_for_vulnerabilities(&target.version, &vulnerabilities)? {
+        if !is_target_version_for_vulnerabilities(
+            &advisory.ghsa_id,
+            &target.version,
+            vulnerabilities,
+        ) {
             trace!(
                 "`{}` does not affect version `{}`, skipped.",
                 advisory.ghsa_id, target.version
@@ -173,7 +177,11 @@ fn process_advisory_type_github_repository(
             }
         };
 
-        if !is_target_version_for_vulnerabilities(&target.version, &vulnerabilities)? {
+        if !is_target_version_for_vulnerabilities(
+            &advisory.ghsa_id,
+            &target.version,
+            vulnerabilities,
+        ) {
             trace!(
                 "`{}` does not affect version `{}`, skipped.",
                 advisory.ghsa_id, target.version
@@ -203,22 +211,31 @@ fn process_advisory_type_github_repository(
 }
 
 fn is_target_version_for_vulnerabilities(
+    advisory_id: &str,
     target_version: impl Into<String>,
     vulnerabilities: &Vec<octocrab::models::security_advisories::Vulnerability>,
-) -> Result<bool, Box<dyn Error>> {
+) -> bool {
     let target_version: String = target_version.into();
-    let is_target_versions: Vec<bool> = vulnerabilities
-        .iter()
-        .map(|v| {
-            let vulnerable_version_range = match &v.vulnerable_version_range {
-                Some(r) => r,
-                None => return Ok(false),
-            };
-            version_is_in_target_range(&target_version, vulnerable_version_range)
-        })
-        .try_collect()?;
 
-    Ok(is_target_versions.iter().any(|r| *r))
+    vulnerabilities.iter().any(|v| {
+        let vulnerable_version_range = match &v.vulnerable_version_range {
+            Some(r) => r,
+            None => return false,
+        };
+
+        match version_is_in_target_range(&target_version, vulnerable_version_range) {
+            Ok(is_in_range) => is_in_range,
+            Err(e) => {
+                // Repository advisories are written by hand, so a range is not always valid semver.
+                // Keep going instead of failing the whole run, but ask the user to check it.
+                warn!(
+                    "Could not parse the version range `{}` of `{}` ({}). It is treated as not affecting version `{}`, please check the advisory manually.",
+                    vulnerable_version_range, advisory_id, e, target_version
+                );
+                false
+            }
+        }
+    })
 }
 
 fn map_advisory(advisory: &gh::SecurityAdvisory) -> Advisory {
