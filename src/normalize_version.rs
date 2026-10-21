@@ -66,7 +66,59 @@ pub fn normalize_version_range(version_range: impl Into<String>) -> Result<Strin
         version_range = range_items.join(" || ");
     }
 
+    // Check if it can parse at this point
+    if VersionReq::parse(&version_range).is_ok() {
+        return Ok(version_range);
+    }
+
+    // `||` で正しく区切られてないパターンを捕捉する
+    let compare_regex = Regex::new(r"(>=|<=|>|<|=)")?;
+    let split_by_comma = version_range
+        .split(",")
+        .map(|v| v.trim())
+        .collect::<Vec<_>>();
+    let mut and_parts: Vec<String> = vec![];
+    for part in split_by_comma {
+        let split_result = regex_split_include_match(part, &compare_regex);
+        let split_parts = split_result
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect::<Vec<_>>();
+        if split_parts.len() == 4 {
+            and_parts.push(format!(
+                "{} {}, {} {}",
+                split_parts[0], split_parts[1], split_parts[2], split_parts[3]
+            ));
+            continue;
+        }
+        if split_parts.len() == 2 {
+            and_parts.push(format!("{} {}", split_parts[0], split_parts[1]));
+            continue;
+        }
+    }
+    let missing_or_pattern = and_parts.join(" || ");
+    if !and_parts.is_empty() && and_parts.iter().all(|v| VersionReq::parse(v).is_ok()) {
+        return Ok(missing_or_pattern);
+    }
+
     Ok(version_range)
+}
+
+fn regex_split_include_match(s: impl Into<String>, re: &Regex) -> Vec<String> {
+    let s = s.into();
+    let s = s.as_str();
+
+    let mut parts: Vec<String> = Vec::new();
+    let mut last = 0;
+    for m in re.find_iter(s) {
+        parts.push((&s[last..m.start()]).to_string());
+        parts.push(m.as_str().to_string());
+        last = m.end();
+    }
+
+    parts.push((&s[last..]).to_string());
+    parts
 }
 
 fn is_branch_list(requirement: &VersionReq) -> bool {
