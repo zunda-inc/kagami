@@ -7,7 +7,7 @@ pub fn normalize_version_range(version_range: impl Into<String>) -> Result<Strin
     let mut version_range: String = version_range.into();
 
     // Should not include v before the version.
-    let front_v_regex = Regex::new(r"v(\d+)")?;
+    let front_v_regex = Regex::new(r"v(\d+)\.")?;
     version_range = front_v_regex
         .replace_all(version_range.as_str(), "$1")
         .to_string();
