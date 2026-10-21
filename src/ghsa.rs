@@ -2,6 +2,7 @@ use crate::advisory::{
     Advisory, CvssScore, CvssSeverities, Epss, Package, Severity, TargetWithAdvisory, Vulnerability,
 };
 use crate::error::KagamiError;
+use crate::normalize_version::normalize_version_range;
 use crate::{AdvisoryType, Target};
 use itertools::Itertools;
 use log::{debug, info, trace, warn};
@@ -355,7 +356,9 @@ fn version_is_in_target_range(
     };
 
     let target_range = target_range.into();
-    let target_ranges = target_range.split("||").map(|s| s.trim());
+    let normalized_target_range = normalize_version_range(&target_range)?;
+    trace!("Normalizing version range: {:?}", normalized_target_range);
+    let target_ranges = normalized_target_range.split("||").map(|s| s.trim());
 
     for range in target_ranges {
         let req = match VersionReq::parse(&range) {
