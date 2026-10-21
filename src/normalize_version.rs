@@ -3,7 +3,7 @@
 //! `1.20.1 and earlier`, `stable <= 2.8.13; beta <= 3.0.0.beta15`, ...
 //!
 //! `normalize_version_range` rewrites the shapes whose meaning is clear into the syntax that
-//! `semver::VersionReq` accepts. It works as a list of small rules that are applied from top to
+//! `semver::VersionReq` accepts; single versions are read by `lenient_semver`. It works as a list of small rules that are applied from top to
 //! bottom; every rule is a function with an example in its comment. A shape no rule understands
 //! comes out still unparsable, so that the caller fails to parse it and warns about it.
 //!
@@ -17,7 +17,7 @@ use crate::normalize_version_words::{
 };
 use itertools::Itertools;
 use regex::Regex;
-use semver::{Comparator, Op, Version, VersionReq};
+use semver::{Comparator, Op, VersionReq};
 
 /// Rewrites a hand-written version range into the syntax `semver::VersionReq` accepts.
 ///   `>= v1.19.0, < v1.19.6`                ->  `>= 1.19.0, < 1.19.6`
@@ -279,6 +279,7 @@ fn split_at_operators(item: &str) -> Vec<String> {
 // Writes one piece as `operator version` with the version fixed; a bare version becomes exact.
 //   `<=4.1.135.Final`  ->  `<= 4.1.135`
 //   `>= 19.03.15`      ->  `>= 19.3.15`
+//   `< 23.7.6.111`     ->  `< 23.7.6`
 //   `3.1.7`            ->  `= 3.1.7`
 //   `2.9.3+6eba5be`    ->  `= 2.9.3`
 fn format_comparator(piece: &str) -> String {
@@ -288,7 +289,7 @@ fn format_comparator(piece: &str) -> String {
     let (operator, version) = piece.split_at(operator_end);
     let version = fix_version(version.trim());
     if operator.is_empty() {
-        format!("= {}", exact_version(&version))
+        format!("= {version}")
     } else {
         format!("{operator} {version}")
     }
@@ -303,95 +304,37 @@ fn is_operator_char(c: char) -> bool {
 
 // ----- one version -----
 
-// Rewrites a version that semver does not accept but whose meaning is clear.
-//   `4.1.135.Final`     ->  `4.1.135`      (Maven's release qualifier is dropped)
+// Rewrites a version that semver does not accept into one it does, with `lenient_semver` doing
+// the reading. Build metadata is dropped because a requirement cannot carry it.
+//   `4.1.135.Final`     ->  `4.1.135`      (Maven's release qualifier is metadata to lenient_semver)
 //   `3.0.0.beta15`      ->  `3.0.0-beta15`  (a word after the patch number is a pre-release)
-//   `0.23.0rc2`         ->  `0.23.0-rc2`
+//   `0.23.0rc2`         ->  `0.23.0-0rc2`
 //   `19.03.15`          ->  `19.3.15`
-//   `23.7.6.111`        ->  `23.7.6.111`  (a fourth number has no semver meaning: left alone)
-//   `9.4.37.v20210219`  ->  `9.4.37.v20210219`  (a build stamp is not a pre-release: left alone)
-//   `1.0.0-rc.1`        ->  `1.0.0-rc.1`
+//   `2.9.3+6eba5be`     ->  `2.9.3`
+//   `23.7.6.111`        ->  `23.7.6`  (a fourth number has no place in semver and is dropped)
+//   `9.4.37.v20210219`  ->  `9.4.37`  (Jetty's build stamp is not a pre-release)
+//   `7.2`               ->  `7.2`     (what `VersionReq` already accepts is left alone)
+//   `3.5-5.9`           ->  `3.5-5.9` (a hyphen could be a pre-release or a range: left alone)
 fn fix_version(version: &str) -> String {
-    let version = drop_leading_zeros(version);
-    let parts: Vec<&str> = version.split('.').collect();
+    // `VersionReq` accepts build metadata but ignores it, so it goes right away.
+    let version = version.split('+').next().unwrap_or(version);
 
-    let fourth_part_is_a_word = parts.len() == 4
-        && parts[3].starts_with(|c: char| c.is_ascii_alphabetic())
-        && !is_build_stamp(parts[3]);
-    if fourth_part_is_a_word {
-        let number = parts[..3].join(".");
-        let qualifier = parts[3];
-        if ["Final", "RELEASE", "GA"].contains(&qualifier) {
-            return number;
-        }
-        return format!("{number}-{qualifier}");
+    let already_accepted = VersionReq::parse(version).is_ok();
+    let has_hyphen = version.contains('-');
+    if already_accepted || has_hyphen {
+        return version.to_string();
     }
 
-    if parts.len() == 3 {
-        let patch = parts[2];
-        if let Some(letters_start) = patch.find(|c: char| c.is_ascii_alphabetic()) {
-            let number = &patch[..letters_start];
-            if !number.is_empty() && number.chars().all(|c| c.is_ascii_digit()) {
-                return format!(
-                    "{}.{}.{number}-{}",
-                    parts[0],
-                    parts[1],
-                    &patch[letters_start..]
-                );
-            }
-        }
-    }
+    let build_stamp = Regex::new(r"^(\d+\.\d+\.\d+)\.v\d+$").expect("the pattern is a constant");
+    let without_stamp = build_stamp.replace(version, "$1");
 
-    version.to_string()
-}
-
-// Removes the leading zeros semver does not allow in a number.
-//   `19.03.15`  ->  `19.3.15`
-//   `030.0`     ->  `30.0`
-//   `1.0.0`     ->  `1.0.0`
-fn drop_leading_zeros(version: &str) -> String {
-    version
-        .split('.')
-        .map(|part| {
-            let is_number = part.chars().all(|c| c.is_ascii_digit());
-            if is_number && part.len() > 1 {
-                part.trim_start_matches('0').to_string()
-            } else {
-                part.to_string()
-            }
-        })
-        .map(|part| {
-            if part.is_empty() {
-                "0".to_string()
-            } else {
-                part
-            }
-        })
-        .join(".")
-}
-
-// Whether a qualifier is a build stamp like Jetty's `v20210219` rather than a pre-release name.
-//   `v20210219`  ->  true
-//   `beta15`     ->  false
-//   `Final`      ->  false
-fn is_build_stamp(qualifier: &str) -> bool {
-    qualifier.len() > 1
-        && qualifier.starts_with('v')
-        && qualifier[1..].chars().all(|c| c.is_ascii_digit())
-}
-
-// Writes a version without its build metadata, which a requirement cannot carry.
-//   `2.9.3+6eba5be`  ->  `2.9.3`
-//   `3.0.0-rc1`      ->  `3.0.0-rc1`
-//   `2.4.0-rc*`      ->  `2.4.0-rc*`  (not a version: left alone)
-fn exact_version(version: &str) -> String {
-    match Version::parse(version) {
+    match lenient_semver::parse(&without_stamp) {
         Ok(parsed) => {
-            let mut exact = format!("{}.{}.{}", parsed.major, parsed.minor, parsed.patch);
+            let mut fixed = format!("{}.{}.{}", parsed.major, parsed.minor, parsed.patch);
             if !parsed.pre.is_empty() {
-                exact = format!("{exact}-{}", parsed.pre);
+                fixed = format!("{fixed}-{}", parsed.pre);
             }
-            exact
+            fixed
         }
         Err(_) => version.to_string(),
     }

@@ -121,7 +121,13 @@ fn keeps_valid_ranges(#[case] range: &str) {
     ">= 4.2.0, <= 4.2.12 || >= 4.1.0, <= 4.1.132"
 )]
 #[case::jetty_alpha_beta(">=12.1.0.alpha0, <=12.1.0.beta2", ">= 12.1.0-alpha0, <= 12.1.0-beta2")]
-#[case::vllm_pep440(">= 0.23.0rc2, < 0.30.0", ">= 0.23.0-rc2, < 0.30.0")]
+#[case::vllm_pep440(">= 0.23.0rc2, < 0.30.0", ">= 0.23.0-0rc2, < 0.30.0")]
+#[case::clickhouse_fourth_number("< 24.3.18.6", "< 24.3.18")]
+#[case::jetty_build_stamp("<= 9.4.32.v20200930, <= 10.0.0.beta2", "<= 9.4.32, <= 10.0.0-beta2")]
+#[case::dotnet_four_part_versions(
+    "16.0.21299.0, <= 15.0.21297.12, < = 13.1.21296.21",
+    "= 16.0.21299 || <= 15.0.21297 || <= 13.1.21296"
+)]
 fn fixes_version_qualifiers(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input), expected);
 }
@@ -224,7 +230,7 @@ fn inserts_missing_commas_inside_alternatives(#[case] input: &str, #[case] expec
     "< 19.03.15, < 20.10.3",
     ">= 19.3.0, < 19.3.15 || >= 20.10.0, < 20.10.3"
 )]
-#[case::vllm_leading_zero("< 030.0", "< 30.0")]
+#[case::vllm_leading_zero("< 030.0", "< 30.0.0")]
 #[case::discourse_comma_inside_label(
     "stable <= 2.7.10; beta,tests-passed <= 2.8.0.beta8;",
     "<= 2.7.10, <= 2.8.0-beta8"
@@ -237,7 +243,6 @@ fn fixes_typos_and_phrases(#[case] input: &str, #[case] expected: &str) {
 // warns when parsing fails, so an invented meaning would go unnoticed.
 #[rstest]
 #[case::caddy_note_only("(confirmed on main @ e0f8d9b2047af417d8faf354b675941f3dac9891)")]
-#[case::dotnet_four_part_versions("16.0.21299.0, <= 15.0.21297.12, < = 13.1.21296.21")]
 #[case::gitea_through_main("<= 1.24 through main (confirmed in v1.27.0-dev)")]
 #[case::kyverno_none("NONE")]
 #[case::podman_arrow("Podman v4.0->v4.9.3, and v5.0")]

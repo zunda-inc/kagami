@@ -18,6 +18,7 @@ serde_json = "1.0.154"
 console = "0.16.6"
 strum_macros = "0.28.0"
 regex = "1.13.1"
+lenient_semver = { version = "0.4.2", features = ["semver"] }
 
 [dev-dependencies]
 rstest = "0.28.0"
