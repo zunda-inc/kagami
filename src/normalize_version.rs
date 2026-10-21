@@ -16,13 +16,15 @@ use itertools::Itertools;
 use regex::Regex;
 use semver::{Comparator, Op, Version, VersionReq};
 
-pub fn normalize_version_range(range: &str) -> String {
-    if parses(range) {
-        return upper_bound_lists_to_branches(range);
+pub fn normalize_version_range(range: impl Into<String>) -> String {
+    let range = range.into();
+    let original = range.clone();
+
+    if parses(&range) {
+        return upper_bound_lists_to_branches(&range);
     }
 
-    let original = range;
-    let range = replace_unusual_characters(range);
+    let range = replace_unusual_characters(&range);
     let range = drop_notes_in_parentheses(&range);
     let range = drop_v_prefixes(&range);
 
@@ -186,7 +188,8 @@ fn bound_every_version(versions: &str, operator: &str, repeated_phrase: &str) ->
 
 // `2.2.0 <= V <= 2.10.1` -> `>= 2.2.0, <= 2.10.1` and `1.22 < 1.27.1` -> `>= 1.22, < 1.27.1`.
 fn interval_to_requirement(range: &str) -> Option<String> {
-    let words: Vec<&str> = range.split_whitespace().collect();
+    let words = range.split_whitespace().collect::<Vec<_>>();
+
     let looks_like_version =
         |word: &str| word.starts_with(|c: char| c.is_ascii_digit()) && !word.contains(',');
     let looks_like_variable = |word: &str| word.starts_with(|c: char| c.is_ascii_alphabetic());
@@ -221,22 +224,25 @@ fn interval_to_requirement(range: &str) -> Option<String> {
 // item is a requirement by itself: a hyphen range, a `>= a < b` pair or an exact version. Then the
 // items are alternatives, like `3.0.0-rc1 - 3.2.0-rc1, 3.1.7` -> `>= 3.0.0-rc1, <= 3.2.0-rc1 || = 3.1.7`.
 fn normalize_alternative(alternative: &str) -> String {
-    let items: Vec<&str> = alternative
+    let items = alternative
         .split(',')
         .map(str::trim)
         .filter(|item| !item.is_empty())
-        .collect();
+        .collect::<Vec<_>>();
+
     let has_digit = |item: &&str| item.chars().any(|c| c.is_ascii_digit());
+
     let some_item_has_a_digit = items.iter().any(has_digit);
-    let requirements: Vec<Vec<String>> = items
+    let requirements = items
         .iter()
         .filter(|item| !some_item_has_a_digit || has_digit(item))
         .map(|item| item_to_comparators(item))
-        .collect();
+        .collect::<Vec<_>>();
 
     let every_item_is_one_comparator = requirements
         .iter()
         .all(|comparators| comparators.len() == 1 && !comparators[0].starts_with("= "));
+
     if every_item_is_one_comparator {
         return group_into_branches(requirements.into_iter().flatten().collect());
     }
@@ -415,6 +421,7 @@ fn exact_version(version: &str) -> String {
 // lower bound, so it becomes `>= 2.1.0, < 2.2.7 || >= 2.3.0, < 2.3.4`.
 fn group_into_branches(comparators: Vec<String>) -> String {
     let mut branches: Vec<Vec<String>> = vec![];
+
     for comparator in comparators {
         let starts_new_branch = comparator.starts_with('>') && !branches.is_empty();
         if starts_new_branch || branches.is_empty() {
@@ -435,10 +442,11 @@ fn group_into_branches(comparators: Vec<String>) -> String {
 // A range that already parses is returned unchanged, unless an alternative is a list of upper bounds
 // like `< 1.8.4, < 1.9.1`.
 fn upper_bound_lists_to_branches(range: &str) -> String {
-    let alternatives: Vec<&str> = range.split("||").map(str::trim).collect();
+    let alternatives = range.split("||").map(str::trim).collect::<Vec<_>>();
     let has_upper_bound_list = alternatives
         .iter()
         .any(|alternative| upper_bounds_to_branches(alternative).is_some());
+
     if !has_upper_bound_list {
         return range.to_string();
     }
@@ -473,9 +481,11 @@ fn upper_bounds_to_branches(requirement: &str) -> Option<String> {
 
     let is_upper_bound_list =
         comparators.len() >= 2 && all_upper_bounds && all_full_versions && all_different_branches;
+
     if !is_upper_bound_list {
         return None;
     }
+
     Some(comparators.iter().map(upper_bound_to_branch).join(" || "))
 }
 
