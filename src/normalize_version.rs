@@ -12,6 +12,9 @@
 //! returned unchanged, except a list of upper bounds like `< 1.8.4, < 1.9.1`, which is read as
 //! release branches.
 
+use crate::normalize_version_words::{
+    replace_ignore_case, replace_unusual_characters, words_to_operators,
+};
 use itertools::Itertools;
 use regex::Regex;
 use semver::{Comparator, Op, Version, VersionReq};
@@ -39,11 +42,13 @@ pub fn normalize_version_range(range: impl Into<String>) -> String {
         .map(normalize_alternative)
         .filter(|alternative| !alternative.is_empty())
         .join(" || ");
+
     if normalized.is_empty() {
         // Nothing usable was left, for example `(confirmed on main @ e0f8d9b)`. The caller gets
         // the original text, so that its warning shows what the advisory actually said.
         return original.to_string();
     }
+
     normalized
 }
 
@@ -54,25 +59,6 @@ fn parses(range: &str) -> bool {
     range
         .split("||")
         .all(|alternative| VersionReq::parse(alternative.trim()).is_ok())
-}
-
-// `≤`, `=<`, `=>`, `< =` and `==` become `<=`, `>=` and `=`. `&&`, `;` and the full-width comma become `,`.
-// An en dash becomes ` - `. Markdown escapes, backticks and a trailing period are dropped.
-fn replace_unusual_characters(range: &str) -> String {
-    range
-        .trim()
-        .trim_end_matches('.')
-        .replace('≤', "<=")
-        .replace('≥', ">=")
-        .replace("=<", "<=")
-        .replace("=>", ">=")
-        .replace("< =", "<=")
-        .replace("> =", ">=")
-        .replace("==", "=")
-        .replace("&&", ",")
-        .replace([';', '，'], ",")
-        .replace(['–', '—'], " - ")
-        .replace(['\\', '`'], "")
 }
 
 // `>= 4.0 (32-bit only)` becomes `>= 4.0`.
@@ -99,79 +85,9 @@ fn is_every_version(range: &str) -> bool {
     lowercase == "all" || lowercase == "all versions"
 }
 
-// Turns the English of hand-written ranges into operators:
-// `1.20.1 and earlier` -> `<= 1.20.1`
-// `7.2.10 and below, 8.0.5 and below` -> `<= 7.2.10, <= 8.0.5`
-// `6.2 or newer` -> `>= 6.2`
-// `2.0.0+` -> `>= 2.0.0`
-// `All versions prior to 1.7.14 and 1.8.7` -> `< 1.7.14, < 1.8.7`
-// `2.2.0 <= V <= 2.10.1` -> `>= 2.2.0, <= 2.10.1`
-// `1.2.0 through 1.8.7` -> `1.2.0 - 1.8.7` (the hyphen range is handled later)
-// `>= 1.0 and < 2.0` -> `>= 1.0, < 2.0`
-fn words_to_operators(range: &str) -> String {
-    let range = strip_prefix_ignore_case(range, "all versions").unwrap_or(range);
-    let range = strip_prefix_ignore_case(range, "from ").unwrap_or(range);
-
-    let upper_bound_prefixes = [
-        ("up to and including", "<="),
-        ("up to", "<="),
-        ("prior to", "<"),
-        ("earlier than", "<"),
-        ("before", "<"),
-        ("until", "<"),
-    ];
-    for (phrase, operator) in upper_bound_prefixes {
-        if let Some(versions) = strip_prefix_ignore_case(range, phrase) {
-            return bound_every_version(versions, operator, "");
-        }
-    }
-
-    let bound_suffixes = [
-        ("and newer", ">="),
-        ("or newer", ">="),
-        ("and later", ">="),
-        ("or later", ">="),
-        ("and above", ">="),
-        ("or above", ">="),
-        ("and earlier", "<="),
-        ("or earlier", "<="),
-        ("and before", "<="),
-        ("or before", "<="),
-        ("and below", "<="),
-        ("or below", "<="),
-        ("and lower", "<="),
-        ("or lower", "<="),
-        ("and older", "<="),
-        ("or older", "<="),
-        ("and prior", "<="),
-    ];
-    for (phrase, operator) in bound_suffixes {
-        if let Some(versions) = strip_suffix_ignore_case(range, phrase) {
-            return bound_every_version(versions, operator, phrase);
-        }
-    }
-
-    if let Some(version) = range.strip_suffix('+')
-        && !version.contains([' ', ','])
-    {
-        return format!(">= {version}");
-    }
-
-    if let Some(requirement) = interval_to_requirement(range) {
-        return requirement;
-    }
-
-    let range = replace_ignore_case(range, " up to and including ", " - ");
-    let range = replace_ignore_case(&range, " through and including ", " - ");
-    let range = replace_ignore_case(&range, " through ", " - ");
-    let range = replace_ignore_case(&range, " until ", " - ");
-    let range = replace_ignore_case(&range, " to ", " - ");
-    replace_ignore_case(&range, " and ", ", ")
-}
-
 // `1.14.2, 1.13.2 and 1.12.4` with `<=` -> `<= 1.14.2, <= 1.13.2, <= 1.12.4`.
 // `repeated_phrase` is removed everywhere first, for `7.2.10 and below, 8.0.5 and below`.
-fn bound_every_version(versions: &str, operator: &str, repeated_phrase: &str) -> String {
+pub fn bound_every_version(versions: &str, operator: &str, repeated_phrase: &str) -> String {
     let versions = if repeated_phrase.is_empty() {
         versions.to_string()
     } else {
@@ -187,7 +103,7 @@ fn bound_every_version(versions: &str, operator: &str, repeated_phrase: &str) ->
 }
 
 // `2.2.0 <= V <= 2.10.1` -> `>= 2.2.0, <= 2.10.1` and `1.22 < 1.27.1` -> `>= 1.22, < 1.27.1`.
-fn interval_to_requirement(range: &str) -> Option<String> {
+pub fn interval_to_requirement(range: &str) -> Option<String> {
     let words = range.split_whitespace().collect::<Vec<_>>();
 
     let looks_like_version =
@@ -499,39 +415,4 @@ fn upper_bound_to_branch(comparator: &Comparator) -> String {
     let (major, minor) = (comparator.major, comparator.minor.unwrap());
     let patch = comparator.patch.unwrap();
     format!(">= {major}.{minor}.0, {operator} {major}.{minor}.{patch}")
-}
-
-// ----- text helpers -----
-
-fn strip_prefix_ignore_case<'a>(text: &'a str, prefix: &str) -> Option<&'a str> {
-    let candidate = text.get(..prefix.len())?;
-    if candidate.eq_ignore_ascii_case(prefix) {
-        Some(text[prefix.len()..].trim_start())
-    } else {
-        None
-    }
-}
-
-fn strip_suffix_ignore_case<'a>(text: &'a str, suffix: &str) -> Option<&'a str> {
-    let start = text.len().checked_sub(suffix.len())?;
-    let candidate = text.get(start..)?;
-    if candidate.eq_ignore_ascii_case(suffix) {
-        Some(text[..start].trim_end())
-    } else {
-        None
-    }
-}
-
-fn replace_ignore_case(text: &str, from: &str, to: &str) -> String {
-    let lowercase_text = text.to_ascii_lowercase();
-    let lowercase_from = from.to_ascii_lowercase();
-    let mut result = String::new();
-    let mut rest_starts_at = 0;
-    for (index, _) in lowercase_text.match_indices(&lowercase_from) {
-        result.push_str(&text[rest_starts_at..index]);
-        result.push_str(to);
-        rest_starts_at = index + from.len();
-    }
-    result.push_str(&text[rest_starts_at..]);
-    result
 }
