@@ -1,0 +1,30 @@
+targets:
+  - version: 8.5.9
+    advisory_type: github_repository
+    repository_path: php/php-src
+
+  - name: github.com/moby/moby
+    version: 26.1.4
+    ecosystem: go
+    advisory_type: github
+
+  - name: k8s.io/kubernetes
+    version: 1.29.0
+    ecosystem: go
+    advisory_type: github
+
+  - name: k8s.io/ingress-nginx
+    version: 1.11.4
+    ecosystem: go
+    advisory_type: github
+
+  - name: github.com/argoproj/argo-cd/v2
+    version: 2.14.5
+    ecosystem: go
+    advisory_type: github
+
+  - version: 1.8.3
+    advisory_type: github_repository
+    repository_path: envoyproxy/gateway
+output_format: text
+log_level: info
