@@ -52,7 +52,7 @@ impl Target {
         let path = match self
             .repository_path
             .as_ref()
-            .and_then(|s| Some(s.split("/").map(|v| v.trim()).collect::<Vec<_>>()))
+            .map(|s| s.split("/").map(|v| v.trim()).collect::<Vec<_>>())
         {
             Some(s) => s,
             None => return Ok(None),

@@ -1,5 +1,5 @@
-use clap::Parser;
 use crate::{LogLevel, OutputFormat};
+use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[command(name = "kagami")]
