@@ -206,7 +206,7 @@ fn process_advisory_type_github_repository(
     })
 }
 
-fn is_target_version_for_vulnerabilities(
+pub fn is_target_version_for_vulnerabilities(
     advisory_id: impl Into<String>,
     target_version: impl Into<String>,
     vulnerabilities: &[octocrab::models::security_advisories::Vulnerability],
@@ -340,7 +340,7 @@ fn map_vulnerability(vulnerability: &gh::Vulnerability) -> Vulnerability {
     }
 }
 
-fn version_is_in_target_range(
+pub fn version_is_in_target_range(
     version: impl Into<String>,
     target_range: impl Into<String>,
 ) -> Result<bool, Box<dyn Error>> {
