@@ -1,4 +1,4 @@
-use log::{debug, warn};
+use log::{debug, info, warn};
 use octocrab::Octocrab;
 use std::env;
 use std::error::Error;
@@ -14,7 +14,7 @@ async fn get_github_pat() -> Result<Option<String>, Box<dyn Error>> {
     let env_gh_token = env::var(ENV_GH_TOKEN);
     let env_github_token = env::var(ENV_GITHUB_TOKEN);
     if let Ok(env_token) = env_gh_token.or(env_github_token) {
-        debug!("Found GH_TOKEN or GITHUB_TOKEN.");
+        info!("Found GH_TOKEN or GITHUB_TOKEN.");
         return Ok(Some(env_token));
     }
 
@@ -27,7 +27,7 @@ async fn get_github_pat() -> Result<Option<String>, Box<dyn Error>> {
 
     match command_result {
         Ok(command_output) if command_output.status.success() => {
-            debug!("Retrieved a token from the `gh auth token` command.");
+            info!("Retrieved a token from the `gh auth token` command.");
             return Ok(Some(
                 String::from_utf8(command_output.stdout)?.trim().to_string(),
             ));
