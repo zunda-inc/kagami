@@ -356,6 +356,7 @@ fn version_is_in_target_range(
     };
 
     let target_range = target_range.into();
+    trace!("Original target range: {:?}", target_range);
     let normalized_target_range = normalize_version_range(&target_range);
     trace!("Normalizing version range: {:?}", normalized_target_range);
     let target_ranges = normalized_target_range.split("||").map(|s| s.trim());
