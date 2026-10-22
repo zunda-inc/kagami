@@ -1,0 +1,50 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Groups the updates into as few PRs as possible: non-breaking ones, breaking ones and the Rust toolchain.",
+    "separateMajorMinor is off so that major updates join the breaking PR instead of getting PRs of their own.",
+    "Every version waits until it is 3 days old as a guard against supply chain attacks. Lock file maintenance stays off because Renovate cannot apply minimumReleaseAge to it.",
+    "There is no schedule and no hourly PR limit, so an update arrives as soon as it passes the cooldown.",
+    "rangeStrategy bump writes the new version into Cargo.toml too, as `cargo add` does, instead of only updating Cargo.lock."
+  ],
+  "extends": ["config:best-practices"],
+  "timezone": "Asia/Tokyo",
+  "minimumReleaseAge": "3 days",
+  "separateMajorMinor": false,
+  "rangeStrategy": "bump",
+  "prHourlyLimit": 0,
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "labels": ["security"]
+  },
+  "lockFileMaintenance": {
+    "enabled": false
+  },
+  "packageRules": [
+    {
+      "description": "Updates that should not need code changes go into one PR.",
+      "matchIsBreaking": false,
+      "groupName": "all non-breaking dependencies",
+      "groupSlug": "all-non-breaking"
+    },
+    {
+      "description": "Breaking updates go into one more PR, including minor bumps of 0.x crates, which Cargo treats as breaking.",
+      "matchIsBreaking": true,
+      "groupName": "all breaking dependencies",
+      "groupSlug": "all-breaking"
+    },
+    {
+      "description": "A pin keeps the version that is already in use, so it joins the non-breaking PR without the cooldown. Renovate has no release timestamp for pins and would otherwise leave the cooldown check pending forever.",
+      "matchUpdateTypes": ["pin"],
+      "minimumReleaseAge": null,
+      "groupName": "all non-breaking dependencies",
+      "groupSlug": "all-non-breaking"
+    },
+    {
+      "description": "A new Rust release can add clippy lints that fail CI, so the toolchain gets its own PR.",
+      "matchManagers": ["rust-toolchain"],
+      "groupName": "Rust toolchain",
+      "groupSlug": "rust-toolchain"
+    }
+  ]
+}
