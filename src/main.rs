@@ -29,7 +29,7 @@ async fn main() -> ExitCode {
         Err(e) => {
             error!(
                 "Failed to load config file from `{}`.",
-                &command.config_file_path
+                command.config_file_path
             );
             error!("{}", e);
             return ExitCode::FAILURE;
