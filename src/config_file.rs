@@ -51,13 +51,18 @@ impl Target {
     pub fn extract_repository_path(&self) -> Result<Option<[&str; 2]>, Box<dyn Error>> {
         let path = match self
             .repository_path
-            .as_ref().map(|s| s.split("/").collect::<Vec<&str>>())
+            .as_ref()
+            .and_then(|s| Some(s.split("/").map(|v| v.trim()).collect::<Vec<_>>()))
         {
             Some(s) => s,
             None => return Ok(None),
         };
 
         if path.len() != 2 {
+            return Err(Box::new(TargetParseError::RepositoryPathInvalid));
+        }
+
+        if path[0].is_empty() || path[1].is_empty() {
             return Err(Box::new(TargetParseError::RepositoryPathInvalid));
         }
 
