@@ -21,7 +21,7 @@ impl Config {
             trace!("Validating target {:?}.", target);
 
             let validate_result = target.validate();
-            validate_result?;;
+            validate_result?;
         }
 
         Ok(())

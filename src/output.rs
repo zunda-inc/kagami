@@ -25,7 +25,7 @@ pub fn output_to_stdout(
     Ok(())
 }
 
-fn output_simple_markdown_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), Box<dyn Error>> {
+fn output_simple_markdown_text(targets: &[TargetWithAdvisory]) -> Result<(), Box<dyn Error>> {
     let stdout_terminal = Term::stdout();
     let not_vulnerable = targets
         .iter()
@@ -371,7 +371,7 @@ fn print_console_divider(terminal: &Term) -> Result<(), Box<dyn Error>> {
 }
 
 fn get_count_by_severity_for_target(
-    results: &Vec<TargetWithAdvisory>,
+    results: &[TargetWithAdvisory],
     severity: Severity,
 ) -> usize {
     results
@@ -382,7 +382,7 @@ fn get_count_by_severity_for_target(
         .len()
 }
 
-fn get_count_by_severity_for_advisories(results: &Vec<Advisory>, severity: Severity) -> usize {
+fn get_count_by_severity_for_advisories(results: &[Advisory], severity: Severity) -> usize {
     results
         .iter()
         .filter(|v| v.severity == severity)
