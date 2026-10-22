@@ -2,6 +2,9 @@
 name = "kagami"
 version = "0.1.0"
 edition = "2024"
+description = "This simple tool checks whether there are any publicly disclosed vulnerabilities in a list of defined software."
+license = "MIT"
+repository = "https://github.com/zunda-inc/kagami"
 
 [dependencies]
 tokio = { version = "1.53.3", features = ["full"] }
