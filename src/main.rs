@@ -27,7 +27,10 @@ async fn main() -> ExitCode {
     let parsed_config_file = match parse_config_file(&command.config_file_path) {
         Ok(f) => f,
         Err(e) => {
-            error!("Failed to load config file.");
+            error!(
+                "Failed to load config file from `{}`.",
+                &command.config_file_path
+            );
             error!("{}", e);
             return ExitCode::FAILURE;
         }
