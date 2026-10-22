@@ -40,7 +40,9 @@ pub async fn find_vulnerabilities(
                 let mut query = security_advisories_query
                     .list()
                     .affects(target_name.clone());
-                if let Some(ecosystem) = &target.ecosystem { query = query.ecosystem(ecosystem) };
+                if let Some(ecosystem) = &target.ecosystem {
+                    query = query.ecosystem(ecosystem)
+                };
                 query = query.per_page(100);
 
                 let page_result = query.send().await?;
@@ -151,7 +153,8 @@ fn process_advisory_type_github(
         repository_path: target.repository_path.clone(),
         advisories: mapped_advisories
             .iter()
-            .sorted_by_key(|a| a.severity.order()).cloned()
+            .sorted_by_key(|a| a.severity.order())
+            .cloned()
             .collect(),
     })
 }
@@ -201,7 +204,8 @@ fn process_advisory_type_github_repository(
         repository_path: target.repository_path.clone(),
         advisories: mapped_advisories
             .iter()
-            .sorted_by_key(|a| a.severity.order()).cloned()
+            .sorted_by_key(|a| a.severity.order())
+            .cloned()
             .collect(),
     })
 }

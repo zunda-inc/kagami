@@ -370,10 +370,7 @@ fn print_console_divider(terminal: &Term) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn get_count_by_severity_for_target(
-    results: &[TargetWithAdvisory],
-    severity: Severity,
-) -> usize {
+fn get_count_by_severity_for_target(results: &[TargetWithAdvisory], severity: Severity) -> usize {
     results
         .iter()
         .flat_map(|v| &v.advisories)
