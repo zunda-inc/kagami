@@ -45,7 +45,7 @@ async fn get_github_pat() -> Result<Option<String>, Box<dyn Error>> {
 
     // Could not get token, will fall back to None
     warn!(
-        "Failed to retrieve GitHub PAT from your environment. It will call the API anonymously. Be careful of the API rate limit! Set `GH_TOKEN` or `GITHUB_TOKEN`, or log in with `gh auth login`."
+        "Failed to retrieve GitHub Personal Access Token (PAT) from your environment. It will call the API anonymously. Be careful of the API rate limit! You can set the PAT using environment variables (`GH_TOKEN` or `GITHUB_TOKEN`), or log in using the command `gh auth login`."
     );
     Ok(None)
 }
