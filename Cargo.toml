@@ -1,10 +1,22 @@
 [package]
-name = "kagami"
+name = "kagami-cli"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.91"
 description = "This simple tool checks whether there are any publicly disclosed vulnerabilities in a list of defined software."
 license = "MIT"
 repository = "https://github.com/zunda-inc/kagami"
+keywords = ["security", "vulnerability", "advisory", "ghsa", "cli"]
+categories = ["command-line-utilities", "security"]
+
+# `kagami` is taken on crates.io, so only the package is named `kagami-cli`; the library and the
+# command keep the name `kagami`.
+[lib]
+name = "kagami"
+
+[[bin]]
+name = "kagami"
+path = "src/main.rs"
 
 [dependencies]
 tokio = { version = "1.53.3", features = ["full"] }
