@@ -16,4 +16,4 @@ software that kagami checks should be reported to that project.
 
 ## Supported versions
 
-Only the latest version on the `main` branch receives security fixes.
+Only the latest release receives security fixes.

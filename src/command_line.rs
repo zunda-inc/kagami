@@ -3,7 +3,7 @@ use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[command(name = "kagami")]
-#[command(version = "1.0.0")]
+#[command(version)]
 #[command(
     about = "This simple tool checks whether there are any publicly disclosed vulnerabilities in a list of defined software.",
     long_about= None

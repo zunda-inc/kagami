@@ -980,7 +980,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kagami"
+name = "kagami-cli"
 version = "0.1.0"
 dependencies = [
  "chrono",

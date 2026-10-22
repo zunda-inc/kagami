@@ -1,5 +1,6 @@
 # kagami
 
+[![crates.io](https://img.shields.io/crates/v/kagami-cli.svg)](https://crates.io/crates/kagami-cli)
 [![CI](https://github.com/zunda-inc/kagami/actions/workflows/ci.yml/badge.svg)](https://github.com/zunda-inc/kagami/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 
@@ -13,13 +14,16 @@ or in the security advisories that a project publishes in its own GitHub reposit
 
 ## Installation
 
-kagami is built from source with [Cargo](https://www.rust-lang.org/tools/install):
+Install kagami from [crates.io](https://crates.io/crates/kagami-cli) with
+[Cargo](https://www.rust-lang.org/tools/install) (Rust 1.91 or later):
 
 ```sh
-cargo install --locked --git https://github.com/zunda-inc/kagami
+cargo install --locked kagami-cli
 ```
 
-kagami is not published on crates.io; the `kagami` crate there is an unrelated project.
+> [!TIP]
+> The crate is named `kagami-cli` because the name `kagami` is taken on crates.io by an unrelated
+> project. The installed command is `kagami`.
 
 ## Usage
 
@@ -91,8 +95,8 @@ mix with the output.
 - `github` searches the [GitHub Advisory Database](https://github.com/advisories) by package name.
   GitHub reviews these advisories and normalizes their version ranges, so prefer this type
   whenever the software is listed there. It does not have to be a library you depend on:
-  Kubernetes (`k8s.io/kubernetes`), ingress-nginx (`k8s.io/ingress-nginx`), Docker Engine
-  (`github.com/moby/moby`) and Argo CD (`github.com/argoproj/argo-cd/v2`) are listed as Go modules.
+  Kubernetes (`k8s.io/kubernetes`), ingress-nginx (`k8s.io/ingress-nginx`), Docker Engine (`github.com/moby/moby`) and
+  Argo CD (`github.com/argoproj/argo-cd/v2`) are listed as Go modules.
 - `github_repository` lists the advisories that a project publishes in the "Security" tab of its
   own GitHub repository. Use it for software that is not in the database, such as the PHP
   interpreter (`php/php-src`) or Envoy Gateway (`envoyproxy/gateway`). New advisories also show up
@@ -107,11 +111,11 @@ mix with the output.
 
 ## Output
 
-| Format                 | Description                                                                       |
-|------------------------|-----------------------------------------------------------------------------------|
-| `text`                 | A colored report for the terminal.                                                |
-| `json`, `yaml`         | The full results as structured data, for scripts and other tools.                 |
-| `simple-markdown-text` | One line per advisory with its severity and link, for posting to Slack or GitHub. |
+| Format                 | Description                                                                                |
+|------------------------|--------------------------------------------------------------------------------------------|
+| `text`                 | A colored report for the terminal.                                                         |
+| `json`, `yaml`         | The full results as structured data, for scripts and other tools.                          |
+| `simple-markdown-text` | One line per advisory with its severity and link, for posting to Slack or GitHub or Teams. |
 
 kagami exits with `0` once the check has finished, whether or not it found advisories, and with
 `1` when the config file is invalid or a request to GitHub fails. To fail a CI job when advisories
@@ -130,7 +134,9 @@ that is available:
 2. `gh auth token`, if you are logged in with the [GitHub CLI](https://cli.github.com/)
 
 Without a token kagami calls the API anonymously, which GitHub limits to 60 requests per hour.
-kagami only reads public data, so the token needs no extra scopes or permissions.
+
+> [!IMPORTANT]
+> kagami only reads public data, so the token needs no extra scopes or permissions.
 
 ## How version ranges are read
 
