@@ -74,7 +74,7 @@ fn output_simple_markdown_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), 
                 format!(
                     "{} [{}] {}",
                     emoji_severity(advisory.severity),
-                    advisory.severity.to_string(),
+                    advisory.severity,
                     advisory.html_url
                 )
                 .as_str(),
@@ -88,11 +88,11 @@ fn output_simple_markdown_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), 
 fn output_text(targets: &Vec<TargetWithAdvisory>) -> Result<(), Box<dyn Error>> {
     let stdout_terminal = Term::stdout();
     let target_count = targets.len();
-    let critical_count = get_count_by_severity_for_target(&targets, Severity::Critical);
-    let high_count = get_count_by_severity_for_target(&targets, Severity::High);
-    let medium_count = get_count_by_severity_for_target(&targets, Severity::Medium);
-    let low_count = get_count_by_severity_for_target(&targets, Severity::Low);
-    let unknown_count = get_count_by_severity_for_target(&targets, Severity::Unknown);
+    let critical_count = get_count_by_severity_for_target(targets, Severity::Critical);
+    let high_count = get_count_by_severity_for_target(targets, Severity::High);
+    let medium_count = get_count_by_severity_for_target(targets, Severity::Medium);
+    let low_count = get_count_by_severity_for_target(targets, Severity::Low);
+    let unknown_count = get_count_by_severity_for_target(targets, Severity::Unknown);
     let total_count = critical_count + high_count + medium_count + low_count + unknown_count;
 
     stdout_terminal.write_line(

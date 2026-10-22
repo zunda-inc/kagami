@@ -40,10 +40,7 @@ pub async fn find_vulnerabilities(
                 let mut query = security_advisories_query
                     .list()
                     .affects(target_name.clone());
-                match &target.ecosystem {
-                    Some(ecosystem) => query = query.ecosystem(ecosystem),
-                    None => {}
-                };
+                if let Some(ecosystem) = &target.ecosystem { query = query.ecosystem(ecosystem) };
                 query = query.per_page(100);
 
                 let page_result = query.send().await?;
@@ -54,7 +51,7 @@ pub async fn find_vulnerabilities(
                     target_name
                 );
 
-                let mapped_results = process_advisory_type_github(&target, &all_result)?;
+                let mapped_results = process_advisory_type_github(target, &all_result)?;
                 debug!(
                     "{} of them affect `{}`.",
                     mapped_results.advisories.len(),
@@ -94,7 +91,7 @@ pub async fn find_vulnerabilities(
                     repository_path[1]
                 );
 
-                let mapped_results = process_advisory_type_github_repository(&target, &all_result)?;
+                let mapped_results = process_advisory_type_github_repository(target, &all_result)?;
                 debug!(
                     "{} of them affect version `{}`.",
                     mapped_results.advisories.len(),
@@ -154,8 +151,7 @@ fn process_advisory_type_github(
         repository_path: target.repository_path.clone(),
         advisories: mapped_advisories
             .iter()
-            .sorted_by_key(|a| a.severity.order())
-            .map(|v| v.clone())
+            .sorted_by_key(|a| a.severity.order()).cloned()
             .collect(),
     })
 }
@@ -205,8 +201,7 @@ fn process_advisory_type_github_repository(
         repository_path: target.repository_path.clone(),
         advisories: mapped_advisories
             .iter()
-            .sorted_by_key(|a| a.severity.order())
-            .map(|v| v.clone())
+            .sorted_by_key(|a| a.severity.order()).cloned()
             .collect(),
     })
 }
@@ -362,7 +357,7 @@ fn version_is_in_target_range(
     let target_ranges = normalized_target_range.split("||").map(|s| s.trim());
 
     for range in target_ranges {
-        let req = match VersionReq::parse(&range) {
+        let req = match VersionReq::parse(range) {
             Ok(v) => v,
             Err(e) => return Err(Box::new(e)),
         };

@@ -28,7 +28,7 @@ async fn main() -> ExitCode {
         Ok(f) => f,
         Err(e) => {
             error!("Failed to load config file.");
-            error!("{}", e.to_string());
+            error!("{}", e);
             return ExitCode::FAILURE;
         }
     };
@@ -44,14 +44,14 @@ async fn main() -> ExitCode {
 
     info!(
         "Config file successfully loaded from `{}`.",
-        &command.config_file_path
+        command.config_file_path
     );
 
     debug!("Validating config...");
 
     if let Err(e) = merged_config.validate() {
         error!("Config has validation error.");
-        error!("{}", e.to_string());
+        error!("{}", e);
         return ExitCode::FAILURE;
     }
 
@@ -59,7 +59,7 @@ async fn main() -> ExitCode {
         Ok(o) => o,
         Err(e) => {
             error!("Failed to initialize GitHub client.");
-            error!("{}", e.to_string());
+            error!("{}", e);
             return ExitCode::FAILURE;
         }
     };
@@ -70,7 +70,7 @@ async fn main() -> ExitCode {
         Ok(o) => o,
         Err(e) => {
             error!("Failed to check the vulnerabilities.");
-            error!("{}", e.to_string());
+            error!("{}", e);
             return ExitCode::FAILURE;
         }
     };
@@ -90,13 +90,10 @@ async fn main() -> ExitCode {
     };
     debug!("Output format is {:?}.", output_format);
 
-    match output_to_stdout(&output_format, &results) {
-        Err(e) => {
-            error!("Failed to write the output.");
-            error!("{}", e.to_string());
-            return ExitCode::FAILURE;
-        }
-        _ => {}
+    if let Err(e) = output_to_stdout(&output_format, &results) {
+        error!("Failed to write the output.");
+        error!("{}", e);
+        return ExitCode::FAILURE;
     };
 
     ExitCode::SUCCESS

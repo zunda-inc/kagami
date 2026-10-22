@@ -21,9 +21,7 @@ impl Config {
             trace!("Validating target {:?}.", target);
 
             let validate_result = target.validate();
-            if let Err(e) = validate_result {
-                return Err(e);
-            };
+            validate_result?;;
         }
 
         Ok(())
@@ -53,8 +51,7 @@ impl Target {
     pub fn extract_repository_path(&self) -> Result<Option<[&str; 2]>, Box<dyn Error>> {
         let path = match self
             .repository_path
-            .as_ref()
-            .and_then(|s| Some(s.split("/").collect::<Vec<&str>>()))
+            .as_ref().map(|s| s.split("/").collect::<Vec<&str>>())
         {
             Some(s) => s,
             None => return Ok(None),
