@@ -33,6 +33,14 @@ use rstest::rstest;
     "{ version: 8.5.9, advisory_type: github_repository, repository_path: php/php-src/ }",
     "`repository_path` is invalid."
 )]
+#[case::path_with_empty_owner(
+    "{ version: 8.5.9, advisory_type: github_repository, repository_path: /php-src }",
+    "`repository_path` is invalid."
+)]
+#[case::path_with_empty_name(
+    "{ version: 8.5.9, advisory_type: github_repository, repository_path: php/ }",
+    "`repository_path` is invalid."
+)]
 fn rejects_invalid_targets(#[case] yaml: &str, #[case] expected: &str) {
     let target: Target = yaml_serde::from_str(yaml).unwrap();
 
@@ -58,12 +66,15 @@ fn accepts_valid_targets(#[case] yaml: &str) {
 }
 
 // 3. `repository_path` becomes the owner and the name of the repository
-#[test]
-fn splits_repository_path() {
-    let target: Target = yaml_serde::from_str(
-        "{ version: 8.5.9, advisory_type: github_repository, repository_path: php/php-src }",
-    )
-    .unwrap();
+#[rstest]
+#[case::php_src(
+    "{ version: 8.5.9, advisory_type: github_repository, repository_path: php/php-src }"
+)]
+#[case::spaces_around_slash(
+    "{ version: 8.5.9, advisory_type: github_repository, repository_path: 'php / php-src' }"
+)]
+fn splits_repository_path(#[case] yaml: &str) {
+    let target: Target = yaml_serde::from_str(yaml).unwrap();
 
     assert_eq!(
         target.extract_repository_path().unwrap(),

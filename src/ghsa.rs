@@ -8,7 +8,7 @@ use itertools::Itertools;
 use log::{debug, info, trace, warn};
 use octocrab::Octocrab;
 use octocrab::models::security_advisories as gh;
-use semver::{Version, VersionReq};
+use semver::{Prerelease, Version, VersionReq};
 use std::error::Error;
 
 pub async fn find_vulnerabilities(
@@ -350,6 +350,12 @@ pub fn version_is_in_target_range(
         Err(e) => return Err(Box::new(e)),
     };
 
+    // `VersionReq` lets a pre-release like `1.32.0-rc.2` match only a range that names a
+    // pre-release of 1.32.0, so it would never be in `< 1.32.10` or `*`. A pre-release is
+    // therefore also checked as the release it leads to.
+    let mut release_version = parsed_version.clone();
+    release_version.pre = Prerelease::EMPTY;
+
     let target_range = target_range.into();
     trace!("Original target range: {:?}", target_range);
     let normalized_target_range = normalize_version_range(&target_range);
@@ -362,7 +368,7 @@ pub fn version_is_in_target_range(
             Err(e) => return Err(Box::new(e)),
         };
 
-        if req.matches(&parsed_version) {
+        if req.matches(&parsed_version) || req.matches(&release_version) {
             trace!("Version `{}` matches the range `{}`.", version, range);
             return Ok(true);
         }

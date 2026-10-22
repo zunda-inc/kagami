@@ -89,3 +89,37 @@ fn matches_exact_and_every_version(
 fn fails_on_unreadable_input(#[case] version: &str, #[case] range: &str) {
     assert!(version_is_in_target_range(version, range).is_err());
 }
+
+// 6. A pre-release target is judged as the release it leads to. `VersionReq` alone never puts
+// `1.32.0-rc.2` inside `< 1.32.10` or `*`
+#[rstest]
+#[case::kubernetes_release_candidate("1.32.0-rc.2", "< 1.32.10", true)]
+#[case::redis_all_release_candidate("8.2.0-rc1", "All", true)]
+#[case::first_affected_release("1.33.0-rc.1", ">= 1.33.0, < 1.33.6", true)]
+#[case::envoy_gateway_branch_start("1.9.0-rc.1", "< 1.8.4, < 1.9.1", true)]
+#[case::argo_cd_exact_release("2.9.3-rc.1", "v2.9.3+6eba5be", true)]
+#[case::fixed_release("2.0.0-rc.1", "< 2.0.0", false)]
+#[case::after_the_range("1.33.0-rc.1", "< 1.32.10", false)]
+fn judges_prerelease_as_its_release(
+    #[case] version: &str,
+    #[case] range: &str,
+    #[case] expected: bool,
+) {
+    assert_eq!(
+        version_is_in_target_range(version, range).unwrap(),
+        expected
+    );
+}
+
+// 7. A range that names pre-releases is compared with the pre-release itself
+#[rstest]
+#[case::kubernetes_prerelease_lower_bound("1.33.0-rc.1", ">= 1.33.0-alpha.0, < 1.33.6", true)]
+#[case::runc_named_prerelease("1.5.0-rc.1", ">= 1.5.0-rc.1, <= 1.5.0-rc.2", true)]
+#[case::runc_after_named_prereleases("1.5.0-rc.3", ">= 1.5.0-rc.1, <= 1.5.0-rc.2", false)]
+#[case::express_named_prerelease("5.0.0-beta.1", ">=5.0.0-alpha.1, <5.0.0-beta.3", true)]
+fn compares_named_prereleases(#[case] version: &str, #[case] range: &str, #[case] expected: bool) {
+    assert_eq!(
+        version_is_in_target_range(version, range).unwrap(),
+        expected
+    );
+}
