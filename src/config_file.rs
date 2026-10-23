@@ -1,10 +1,10 @@
+use crate::advisory::Severity;
 use clap::ValueEnum;
 use log::{debug, trace};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use crate::advisory::Severity;
 
 #[derive(Clone, Deserialize, Debug)]
 #[serde(default)]
@@ -12,7 +12,7 @@ pub struct Config {
     pub targets: Vec<Target>,
     pub output_format: Option<OutputFormat>,
     pub log_level: Option<LogLevel>,
-    pub fail_on_severity: Option<Severity>
+    pub fail_on_severity: Option<Severity>,
 }
 
 impl Config {

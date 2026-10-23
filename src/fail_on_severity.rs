@@ -1,9 +1,6 @@
 use crate::advisory::{Severity, TargetWithAdvisory};
 
-pub fn should_fail_on_severity(
-    results: &[TargetWithAdvisory],
-    severity: Option<Severity>,
-) -> bool {
+pub fn should_fail_on_severity(results: &[TargetWithAdvisory], severity: Option<Severity>) -> bool {
     let severity = match severity {
         Some(s) => s,
         None => return false,
