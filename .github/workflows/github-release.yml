@@ -4,15 +4,37 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup rust toolchain
+        run: rustup toolchain install
+      # The version in Cargo.toml will be used as git tag name.
+      - name: Read version
+        id: version
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 | jq -er '.packages[0].version')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
   build:
-    environment: crates-io-release
+    needs: version
     runs-on: ${{ matrix.job.os }}
+    defaults:
+      run:
+        # PowerShell, the default on Windows, does not stop at a failing command.
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -24,27 +46,60 @@ jobs:
           - { os: windows-latest , target: x86_64-pc-windows-msvc         , use-cross: false , extension: .exe }
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Setup rust toolchain
-        run: rustup toolchain install
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.job.target }}
       - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         if: matrix.job.use-cross == true
         with:
-          tool: cargo-cross
+          tool: cross
       - name: Build
         if: matrix.job.use-cross == false
-        run: cargo build --release --target ${{ matrix.job.target }}
+        run: cargo build --release --locked --target ${{ matrix.job.target }}
+        env:
+          # windows-latest has no NASM, which aws-lc-sys needs for x86_64 Windows, so the objects
+          # prebuilt in the crate are used there instead.
+          AWS_LC_SYS_PREBUILT_NASM_x86_64_pc_windows_msvc: 1
       - name: Build(cross)
         if: matrix.job.use-cross == true
-        run: cargo cross build --release --target ${{ matrix.job.target }}
+        run: cross build --release --locked --target ${{ matrix.job.target }}
       - name: Rename artifacts
         run: |
-          mv target/${{ matrix.job.target }}/release/${{ env.PROJECT_NAME }} ${{ env.PROJECT_NAME }}-${{ github.ref_name }}-${{ matrix.job.target }}${{ matrix.job.extension }}
+          mv target/${{ matrix.job.target }}/release/kagami${{ matrix.job.extension }} kagami-$VERSION-${{ matrix.job.target }}${{ matrix.job.extension }}
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: kagami-${{ matrix.job.target }}
+          path: kagami-${{ needs.version.outputs.version }}-${{ matrix.job.target }}${{ matrix.job.extension }}
+          if-no-files-found: error
+
+  release:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    # The environment only accepts runs from main.
+    environment: crates-io-release
+    permissions:
+      contents: write # For action-gh-release to create the tag and the release
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: kagami-*
+          path: artifacts
+          merge-multiple: true
       - name: Release
-        if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: |
-            target/${{ matrix.job.target }}/release/${{ env.PROJECT_NAME }}-${{ github.ref_name }}-${{ matrix.job.target }}${{ matrix.job.extension }}
+          tag_name: ${{ needs.version.outputs.version }}
+          # A new tag is created on the commit that was built.
+          target_commitish: ${{ github.sha }}
+          files: artifacts/*
+          fail_on_unmatched_files: true
