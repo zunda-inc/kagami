@@ -35,7 +35,7 @@ jobs:
         if: matrix.job.use-cross == false
         run: cargo build --release --target ${{ matrix.job.target }}
       - name: Build(cross)
-        if: matrix.job.use-cross == false
+        if: matrix.job.use-cross == true
         run: cargo cross build --release --target ${{ matrix.job.target }}
       - name: Rename artifacts
         run: |
