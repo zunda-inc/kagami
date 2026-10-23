@@ -7,6 +7,7 @@ pub mod config_merger;
 pub use command_line::*;
 pub mod advisory;
 pub mod error;
+pub mod fail_on_severity;
 pub mod ghsa;
 pub mod github_client;
 pub mod logger;
