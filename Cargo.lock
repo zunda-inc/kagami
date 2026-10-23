@@ -983,6 +983,7 @@ dependencies = [
 name = "kagami-cli"
 version = "0.1.0"
 dependencies = [
+ "aws-lc-rs",
  "chrono",
  "clap",
  "console",
