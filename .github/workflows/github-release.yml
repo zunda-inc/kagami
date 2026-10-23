@@ -19,13 +19,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Setup rust toolchain
-        run: rustup toolchain install
       # The version in Cargo.toml will be used as git tag name.
       - name: Read version
         id: version
         run: |
-          version=$(cargo metadata --no-deps --format-version 1 | jq -er '.packages[0].version')
+          version=$(yq -p toml -oy -e '.package.version' Cargo.toml)
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
   build:
@@ -60,10 +58,6 @@ jobs:
       - name: Build
         if: matrix.job.use-cross == false
         run: cargo build --release --locked --target ${{ matrix.job.target }}
-        env:
-          # windows-latest has no NASM, which aws-lc-sys needs for x86_64 Windows, so the objects
-          # prebuilt in the crate are used there instead.
-          AWS_LC_SYS_PREBUILT_NASM_x86_64_pc_windows_msvc: 1
       - name: Build(cross)
         if: matrix.job.use-cross == true
         run: cross build --release --locked --target ${{ matrix.job.target }}
