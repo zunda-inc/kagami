@@ -104,8 +104,7 @@ async fn main() -> ExitCode {
         error!(
             "A vulnerability rated `{}` or higher, as specified in the settings, has been detected.",
             merged_config
-                .fail_on_severity
-                .and_then(|f| Some(f.to_string()))
+                .fail_on_severity.map(|f| f.to_string())
                 .unwrap_or("".to_string())
         );
         error!("Will exit with exit code 1.");
