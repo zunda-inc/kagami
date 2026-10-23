@@ -1,6 +1,7 @@
 use clap::Parser;
 use kagami::config_file_parser::parse_config_file;
 use kagami::config_merger::merge_config;
+use kagami::fail_on_severity::should_fail_on_severity;
 use kagami::ghsa::find_vulnerabilities;
 use kagami::github_client::init_octocrab;
 use kagami::logger::{initialize_default_logger, initialize_logger_by_loglevel};
@@ -98,6 +99,18 @@ async fn main() -> ExitCode {
         error!("{}", e);
         return ExitCode::FAILURE;
     };
+
+    if should_fail_on_severity(&results, merged_config.fail_on_severity) {
+        error!(
+            "A vulnerability rated `{}` or higher, as specified in the settings, has been detected.",
+            merged_config
+                .fail_on_severity
+                .map(|f| f.to_string())
+                .unwrap_or("".to_string())
+        );
+        error!("Will exit with exit code 1.");
+        return ExitCode::FAILURE;
+    }
 
     ExitCode::SUCCESS
 }

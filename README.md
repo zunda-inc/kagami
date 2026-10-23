@@ -74,6 +74,8 @@ kagami [OPTIONS] [CONFIG_FILE_PATH]
 - `CONFIG_FILE_PATH`: the config file to read (default: `kagami.yaml`)
 - `-o`, `--output-format`: `text` (default), `json`, `yaml` or `simple-markdown-text`
 - `-l`, `--log-level`: `error`, `warn` (default), `info`, `debug` or `trace`
+- `-f`, `--fail-on-severity`: `unknown`, `low`, `medium`, `high` or `critical`, the lowest severity
+  that makes kagami exit with `1` (not set by default, see [Output](#output))
 
 The options override the settings in the config file. Logs are written to stderr, so they do not
 mix with the output.
@@ -104,10 +106,11 @@ mix with the output.
 
 ### Other settings
 
-| Field           | Default | Values                                         |
-|-----------------|---------|------------------------------------------------|
-| `output_format` | `text`  | `text`, `json`, `yaml`, `simple_markdown_text` |
-| `log_level`     | `warn`  | `error`, `warn`, `info`, `debug`, `trace`      |
+| Field              | Default | Values                                         |
+|--------------------|---------|------------------------------------------------|
+| `output_format`    | `text`  | `text`, `json`, `yaml`, `simple_markdown_text` |
+| `log_level`        | `warn`  | `error`, `warn`, `info`, `debug`, `trace`      |
+| `fail_on_severity` | Not set | `unknown`, `low`, `medium`, `high`, `critical` |
 
 ## Output
 
@@ -117,13 +120,18 @@ mix with the output.
 | `json`, `yaml`         | The full results as structured data, for scripts and other tools.                          |
 | `simple-markdown-text` | One line per advisory with its severity and link, for posting to Slack or GitHub or Teams. |
 
-kagami exits with `0` once the check has finished, whether or not it found advisories, and with
-`1` when the config file is invalid or a request to GitHub fails. To fail a CI job when advisories
-are found, check the JSON output, for example with [jq](https://jqlang.org/):
+By default, kagami exits with `0` once the check has finished, whether or not it found advisories,
+and with `1` when the config file is invalid or a request to GitHub fails.
+
+To fail a CI job when advisories are found, set `-f` or `fail_on_severity` in the config file.
+kagami writes the output as usual, then exits with `1` if it found an advisory of that severity or
+higher:
 
 ```sh
-kagami -o json | jq -e 'all(.[]; .advisories == [])'
+kagami -f high
 ```
+
+`unknown` counts as the lowest severity, so `-f unknown` fails on any advisory.
 
 ## GitHub API token
 

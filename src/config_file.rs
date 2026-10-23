@@ -1,3 +1,4 @@
+use crate::advisory::Severity;
 use clap::ValueEnum;
 use log::{debug, trace};
 use semver::Version;
@@ -11,6 +12,7 @@ pub struct Config {
     pub targets: Vec<Target>,
     pub output_format: Option<OutputFormat>,
     pub log_level: Option<LogLevel>,
+    pub fail_on_severity: Option<Severity>,
 }
 
 impl Config {
@@ -34,6 +36,7 @@ impl Default for Config {
             targets: Vec::new(),
             output_format: Some(OutputFormat::Text),
             log_level: Some(LogLevel::Warn),
+            fail_on_severity: None,
         }
     }
 }

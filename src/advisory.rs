@@ -1,6 +1,7 @@
 use crate::AdvisoryType;
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use clap::ValueEnum;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct TargetWithAdvisory {
@@ -29,8 +30,20 @@ pub struct Advisory {
 }
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, strum_macros::Display,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    ValueEnum,
+    strum_macros::Display,
 )]
+#[serde(rename_all = "snake_case")]
 pub enum Severity {
     Unknown,
     Low,
