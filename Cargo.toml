@@ -19,7 +19,7 @@ name = "kagami"
 path = "src/main.rs"
 
 [dependencies]
-tokio = { version = "1.53.3", features = ["full"] }
+tokio = { version = "1.54.1", features = ["full"] }
 yaml_serde = "0.10.7"
 serde = { version = "1.0.229", features = ["derive"] }
 clap = { version = "4.6.7", features = ["derive"] }
