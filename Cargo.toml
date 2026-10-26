@@ -1,6 +1,6 @@
 [package]
 name = "kagami-cli"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 rust-version = "1.91"
 description = "This simple tool checks whether there are any publicly disclosed vulnerabilities in a list of defined software."
