@@ -25,7 +25,7 @@ use semver::{Comparator, Op, VersionReq};
 ///   `>= v1.19.0, < v1.19.6`                ->  `>= 1.19.0, < 1.19.6`
 ///   `1.2.0 through 1.8.7`                  ->  `>= 1.2.0, <= 1.8.7`
 ///   `>= 2.1.0 < 2.2.7,  >= 2.3.0 < 2.3.4`  ->  `>= 2.1.0, < 2.2.7 || >= 2.3.0, < 2.3.4`
-///   `< 1.8.4, < 1.9.1`                     ->  `>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`
+///   `< 1.8.4, < 1.9.1`                     ->  `< 1.8.4 || >= 1.9.0, < 1.9.1`
 ///   `v1.18.0,v1.18.1`                      ->  `= 1.18.0 || = 1.18.1`
 ///   `10.0.0-rc.1`                          ->  `= 10.0.0-rc.1`  (parses, but as `^10.0.0-rc.1`)
 ///   `All`                                  ->  `*`
@@ -192,7 +192,7 @@ pub fn interval_to_requirement(range: &str) -> Option<String> {
 //   `>= 9.0.0, <= 9.0.13 >= 10.0.0, <= 10.0.3`             ->  `>= 9.0.0, <= 9.0.13 || >= 10.0.0, <= 10.0.3`
 //   `3.0.0-rc1 - 3.2.0-rc1, 3.1.7`                         ->  `>= 3.0.0-rc1, <= 3.2.0-rc1 || = 3.1.7`
 //   `stable <= 2.7.10, beta, tests-passed <= 2.8.0.beta8`  ->  `<= 2.7.10, <= 2.8.0-beta8`
-//   `< 1.8.4, < 1.9.1`                                     ->  `>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`
+//   `< 1.8.4, < 1.9.1`                                     ->  `< 1.8.4 || >= 1.9.0, < 1.9.1`
 fn normalize_alternative(alternative: &str) -> String {
     let items = alternative
         .split(',')
@@ -215,29 +215,52 @@ fn normalize_alternative(alternative: &str) -> String {
 // Turns one comma-separated item into its comparators, each written as `operator version`.
 //   `stable <= 2.8.13`  ->  [`<= 2.8.13`]
 //   `3.2.0 - 3.3.8`     ->  [`>= 3.2.0`, `<= 3.3.8`]
+//   `1.9.0-1.9.6`       ->  [`>= 1.9.0`, `<= 1.9.6`]
 //   `>= 2.1.0 < 2.2.7`  ->  [`>= 2.1.0`, `< 2.2.7`]
 //   `2.9.3+6eba5be`     ->  [`= 2.9.3`]
 //   `<=4.1.135.Final`   ->  [`<= 4.1.135`]
 fn item_to_comparators(item: &str) -> Vec<String> {
     let item = drop_label(item);
 
-    if let Some((from, to)) = item.split_once(" - ") {
-        let (from, to) = (from.trim(), to.trim());
-        let both_are_versions = [from, to]
-            .iter()
-            .all(|side| side.starts_with(|c: char| c.is_ascii_digit()));
-        if both_are_versions {
-            return vec![
-                format!(">= {}", fix_version(from)),
-                format!("<= {}", fix_version(to)),
-            ];
-        }
+    if let Some((from, to)) = split_hyphen_range(&item) {
+        return vec![
+            format!(">= {}", fix_version(from)),
+            format!("<= {}", fix_version(to)),
+        ];
     }
 
     split_at_operators(&item)
         .iter()
         .map(|piece| format_comparator(piece))
         .collect()
+}
+
+// Splits a hyphen range into its two versions. Without spaces around the hyphen, only digits and
+// dots may follow it, with at least one dot: a hyphen also starts a pre-release (`10.0.0-rc.1`)
+// or ImageMagick's patch level (`7.1.1-4`).
+//   `3.2.0 - 3.3.8`  ->  Some((`3.2.0`, `3.3.8`))
+//   `1.9.0-1.9.6`    ->  Some((`1.9.0`, `1.9.6`))
+//   `3.5-5.9`        ->  Some((`3.5`, `5.9`))
+//   `10.0.0-rc.1`    ->  None
+//   `7.1.1-4`        ->  None
+//   `edge-24.6.2`    ->  None  (a word before the hyphen)
+fn split_hyphen_range(item: &str) -> Option<(&str, &str)> {
+    let starts_with_digit = |text: &str| text.starts_with(|c: char| c.is_ascii_digit());
+
+    let (from, to, is_range) = match item.split_once(" - ") {
+        Some((from, to)) => {
+            let (from, to) = (from.trim(), to.trim());
+            (from, to, starts_with_digit(from) && starts_with_digit(to))
+        }
+        None => {
+            let (from, to) = item.split_once('-')?;
+            let to_is_plain_version =
+                to.contains('.') && to.chars().all(|c| c.is_ascii_digit() || c == '.');
+            (from, to, starts_with_digit(from) && to_is_plain_version)
+        }
+    };
+
+    if is_range { Some((from, to)) } else { None }
 }
 
 // Removes the words written in front of a comparator or version, like a release channel or a
@@ -322,7 +345,7 @@ fn is_operator_char(c: char) -> bool {
 //   `23.7.6.111`        ->  `23.7.6`  (a fourth number has no place in semver and is dropped)
 //   `9.4.37.v20210219`  ->  `9.4.37`  (Jetty's build stamp is not a pre-release)
 //   `7.2`               ->  `7.2`     (what `VersionReq` already accepts is left alone)
-//   `3.5-5.9`           ->  `3.5-5.9` (a hyphen could be a pre-release or a range: left alone)
+//   `3.0-6`             ->  `3.0-6`   (a hyphen could be a pre-release or a range: left alone)
 fn fix_version(version: &str) -> String {
     // `VersionReq` accepts build metadata but ignores it, so it goes right away.
     let version = version.split('+').next().unwrap_or(version);
@@ -356,8 +379,8 @@ fn fix_version(version: &str) -> String {
 //   [`>= 1.0.0`, `< 1.2.6`]                         ->  `>= 1.0.0, < 1.2.6`
 //   [`>= 2.1.0`, `< 2.2.7`, `>= 2.3.0`, `< 2.3.4`]  ->  `>= 2.1.0, < 2.2.7 || >= 2.3.0, < 2.3.4`
 //   [`< 3.5.3`, `>= 3.6.0`, `< 3.11.3`]             ->  `< 3.5.3 || >= 3.6.0, < 3.11.3`
-//   [`< 1.8.4`, `< 1.9.1`]                          ->  `>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`
-//   [`<= 1.11.14`, `<= 1.12.7`, `= 1.13.0`]         ->  `>= 1.11.0, <= 1.11.14 || >= 1.12.0, <= 1.12.7 || = 1.13.0`
+//   [`< 1.8.4`, `< 1.9.1`]                          ->  `< 1.8.4 || >= 1.9.0, < 1.9.1`
+//   [`<= 1.11.14`, `<= 1.12.7`, `= 1.13.0`]         ->  `<= 1.11.14 || >= 1.12.0, <= 1.12.7 || = 1.13.0`
 //   [`>= 5.0.0`, `= 6.0.0`]                         ->  `>= 5.0.0, <= 6.0.0`
 fn group_into_branches(comparators: Vec<String>) -> String {
     let mut branches: Vec<Vec<String>> = vec![];
@@ -442,8 +465,8 @@ fn is_upper_bound_of_branch(comparator: &str, exact_version: &str) -> bool {
 // For a range that already parses: returns it unchanged, except that a list of upper bounds is
 // read as release branches.
 //   `>= 1.0.0, < 1.2.6`            ->  `>= 1.0.0, < 1.2.6`
-//   `< 1.8.4, < 1.9.1`             ->  `>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`
-//   `< 1.0.0 || < 1.8.4, < 1.9.1`  ->  `< 1.0.0 || >= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`
+//   `< 1.8.4, < 1.9.1`             ->  `< 1.8.4 || >= 1.9.0, < 1.9.1`
+//   `< 1.0.0 || < 1.8.4, < 1.9.1`  ->  `< 1.0.0 || < 1.8.4 || >= 1.9.0, < 1.9.1`
 fn upper_bound_lists_to_branches(range: &str) -> String {
     let alternatives = range.split("||").map(str::trim).collect::<Vec<_>>();
     let has_upper_bound_list = alternatives
@@ -463,10 +486,11 @@ fn upper_bound_lists_to_branches(range: &str) -> String {
 }
 
 // Reads a requirement made of upper bounds only, like `< 1.8.4, < 1.9.1`, as the fix of several
-// release branches. Literally the comma is AND, which would drop the 1.9 branch, so every upper
-// bound gets its own branch as lower bound. Returns None for any other requirement.
-//   `< 1.8.4, < 1.9.1`         ->  Some(`>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`)
-//   `<= 4.2.12, <= 4.1.132`    ->  Some(`>= 4.2.0, <= 4.2.12 || >= 4.1.0, <= 4.1.132`)
+// release branches. Literally the comma is AND, which would drop the 1.9 branch, so the bounds
+// become alternatives, and each one but the lowest gets a lower bound that leaves out the fixed
+// versions of the listed branches below it. Returns None for any other requirement.
+//   `< 1.8.4, < 1.9.1`         ->  Some(`< 1.8.4 || >= 1.9.0, < 1.9.1`)
+//   `<= 4.2.12, <= 4.1.132`    ->  Some(`>= 4.2.0, <= 4.2.12 || <= 4.1.132`)
 //   `<8.4.26`                  ->  None  (one bound is kept literal)
 //   `< 1.8.4, < 1.8.9`         ->  None  (same branch twice)
 //   `<= 1.4.0-rc.2, <= 1.3.5`  ->  None  (pre-release)
@@ -495,13 +519,34 @@ fn upper_bounds_to_branches(requirement: &str) -> Option<String> {
         return None;
     }
 
-    Some(comparators.iter().map(upper_bound_to_branch).join(" || "))
+    let branches = comparators
+        .iter()
+        .map(|c| (c.major, c.minor.unwrap()))
+        .collect::<Vec<_>>();
+
+    Some(
+        comparators
+            .iter()
+            .map(|comparator| {
+                let branch = (comparator.major, comparator.minor.unwrap());
+                let previous_branch = branches.iter().filter(|other| **other < branch).max();
+                upper_bound_to_branch(comparator, previous_branch)
+            })
+            .join(" || "),
+    )
 }
 
-// Gives an upper bound the start of its release branch as lower bound.
-//   `< 1.8.4`    ->  `>= 1.8.0, < 1.8.4`
-//   `<= 4.2.12`  ->  `>= 4.2.0, <= 4.2.12`
-fn upper_bound_to_branch(comparator: &Comparator) -> String {
+// Gives an upper bound a lower bound that leaves out the listed branch before it, which has a fix
+// of its own. Minor versions that the list skips came out before the listed one and never got the
+// fix, so the bound reaches back to the minor version after the previous branch, or to the start
+// of its major version if that branch is in an older one (whose later minor versions may have come
+// out with the fix). The lowest bound keeps no lower bound, as the versions before it never got
+// the fix either.
+//   (`< 1.9.1`, after 1.8)    ->  `>= 1.9.0, < 1.9.1`
+//   (`< 3.27.3`, after 3.20)  ->  `>= 3.21.0, < 3.27.3`  (Quarkus lists its LTS branches only)
+//   (`< 2.4.0`, after 1.3)    ->  `>= 2.0.0, < 2.4.0`    (OpenSearch: 2.0.0-2.3.0 are affected)
+//   (`< 1.8.4`, the lowest)   ->  `< 1.8.4`
+fn upper_bound_to_branch(comparator: &Comparator, previous_branch: Option<&(u64, u64)>) -> String {
     let operator = if comparator.op == Op::LessEq {
         "<="
     } else {
@@ -509,5 +554,13 @@ fn upper_bound_to_branch(comparator: &Comparator) -> String {
     };
     let (major, minor) = (comparator.major, comparator.minor.unwrap());
     let patch = comparator.patch.unwrap();
-    format!(">= {major}.{minor}.0, {operator} {major}.{minor}.{patch}")
+    let upper_bound = format!("{operator} {major}.{minor}.{patch}");
+
+    match previous_branch {
+        Some(&(previous_major, previous_minor)) if previous_major == major => {
+            format!(">= {major}.{}.0, {upper_bound}", previous_minor + 1)
+        }
+        Some(_) => format!(">= {major}.0.0, {upper_bound}"),
+        None => upper_bound,
+    }
 }

@@ -156,10 +156,18 @@ kagami matches the target version against the vulnerable version ranges of each 
   into semver ranges. A range that it still cannot read is logged as a warning and treated as not
   affecting the target, so check those advisories yourself.
 - A list of upper bounds such as `< 1.8.4, < 1.9.1` is read as one fix per release branch
-  (`>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`).
+  (`< 1.8.4 || >= 1.9.0, < 1.9.1`). Only the versions of a listed branch from its fix on are taken
+  out: the branches before the lowest bound, and the minor versions that the list skips before a
+  listed branch of the same major version, stay affected, as they never got the fix.
 - A version without an operator, such as `10.0.0`, means that version only (semver alone would
   read it as `^10.0.0`). Next to a bound whose release branch misses its other end, it is that
   end: `>= 5.0.0, 6.0.0` is read as `>= 5.0.0, <= 6.0.0`.
+- A list of versions such as `1.37.0, 1.36.4` means exactly these versions. Some advisories use the
+  same list for these and the earlier versions of their branches, which only the description tells
+  apart, so read the description when your branch is in the list.
+- A hyphen between two versions is a range. Without spaces (`1.9.0-1.9.6`), it is one only when a
+  version with a dot follows it; otherwise it belongs to the version, as in `10.0.0-rc.1` or
+  `7.1.1-4`.
 - A pre-release target such as `1.32.0-rc.2` is also checked as the release it leads to (`1.32.0`).
 
 Hand-written ranges do not always describe every release branch precisely, so read the ranges in

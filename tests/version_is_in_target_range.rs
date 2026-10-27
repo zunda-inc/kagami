@@ -13,6 +13,8 @@ use rstest::rstest;
 #[case::redis_below_partial_lower_bound("7.1.9", ">= 7.2", false)]
 #[case::argo_cd_through_is_inclusive("1.8.7", "1.2.0 through 1.8.7", true)]
 #[case::argo_cd_after_through("1.8.8", "1.2.0 through 1.8.7", false)]
+#[case::libgit2_hyphen_without_spaces("1.9.3", "1.9.0-1.9.6", true)]
+#[case::libgit2_after_hyphen_without_spaces("1.9.7", "1.9.0-1.9.6", false)]
 fn checks_bounds(#[case] version: &str, #[case] range: &str, #[case] expected: bool) {
     assert_eq!(
         version_is_in_target_range(version, range).unwrap(),
@@ -48,12 +50,19 @@ fn matches_any_alternative(#[case] version: &str, #[case] range: &str, #[case] e
 }
 
 // 3. Upper bounds of several release branches in one entry: each bound covers its own branch, so
-// 1.9.0 is affected although it is not below 1.8.4
+// 1.9.0 is affected although it is not below 1.8.4. Branches before the lowest bound and the minor
+// versions the list skips never got the fix, so they stay affected
 #[rstest]
 #[case::envoy_gateway_older_branch("1.8.3", "< 1.8.4, < 1.9.1", true)]
 #[case::envoy_gateway_newer_branch("1.9.0", "< 1.8.4, < 1.9.1", true)]
 #[case::envoy_gateway_older_branch_patched("1.8.4", "< 1.8.4, < 1.9.1", false)]
 #[case::envoy_gateway_newer_branch_patched("1.9.1", "< 1.8.4, < 1.9.1", false)]
+#[case::envoy_gateway_branch_without_fix("1.7.5", "< 1.8.4, < 1.9.1", true)]
+#[case::argo_cd_branch_without_fix("1.6.2", "All versions prior to 1.7.12 and 1.8.4", true)]
+#[case::quarkus_skipped_branch("3.25.1", "<3.20.6, <3.27.3, <3.33.1, <3.35.1", true)]
+#[case::quarkus_lts_patched("3.27.3", "<3.20.6, <3.27.3, <3.33.1, <3.35.1", false)]
+#[case::opensearch_new_major_before_its_fix("2.3.0", "<1.3.7; <2.4.0", true)]
+#[case::opensearch_new_major_patched("2.4.0", "<1.3.7; <2.4.0", false)]
 fn reads_upper_bounds_as_branches(
     #[case] version: &str,
     #[case] range: &str,
@@ -71,6 +80,7 @@ fn reads_upper_bounds_as_branches(
 #[case::argo_cd_next_patch("2.9.4", "v2.9.3+6eba5be", false)]
 #[case::aspnetcore_without_v("10.0.0-rc.1.25451.107", "10.0.0-rc.1.25451.107", true)]
 #[case::aspnetcore_without_v_later_patch("10.0.14", "10.0.0-rc.1.25451.107", false)]
+#[case::envoy_list_without_v_later_patch("1.39.1", "1.37.0,1.36.4,1.35.8,1.34.12", false)]
 #[case::redis_all("8.2.1", "All", true)]
 fn matches_exact_and_every_version(
     #[case] version: &str,
