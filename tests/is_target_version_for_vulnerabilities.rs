@@ -67,8 +67,9 @@ fn skips_entries_without_usable_range(
 }
 
 // 3. With `packages`, only the entries of the listed packages count. Microsoft lists many packages
-// in one advisory, with platforms and version schemes of their own. An entry without a package
-// name still counts, and without `packages` every entry does.
+// in one advisory, with platforms and version schemes of their own. Names compare ignoring case,
+// as NuGet does, and a `.*` in the name of an entry stands for any name after the dot. An entry
+// without a package name still counts, and without `packages` every entry does.
 #[rstest]
 // GHSA-p3jp-9v83-76w9
 #[case::listed_package(
@@ -107,6 +108,36 @@ fn skips_entries_without_usable_range(
     Some("Microsoft.NETCore.App.Runtime.win-x64"),
     ">= 10.0.0, < 10.0.14",
     true
+)]
+// GHSA-73j8-2gch-69rq writes `NetCore`
+#[case::case_differs(
+    "10.0.3",
+    Some(vec!["Microsoft.NETCore.App.Runtime.linux-x64"]),
+    Some("Microsoft.NetCore.App.Runtime.linux-x64"),
+    ">= 9.0.0, <= 9.0.13 >= 10.0.0, <= 10.0.3",
+    true
+)]
+// GHSA-3rq8-h3gj-r5c6 lists every runtime of ASP.NET Core as one entry
+#[case::wildcard(
+    "6.0.4",
+    Some(vec!["Microsoft.AspNetCore.App.Runtime.linux-x64"]),
+    Some("Microsoft.AspNetCore.App.Runtime.*"),
+    ">=3.0.0,<=3.1.24 >=5.0.0,<=5.0.16 >=6.0.0,<=6.0.4",
+    true
+)]
+#[case::wildcard_other_package(
+    "6.0.4",
+    Some(vec!["Microsoft.NETCore.App.Runtime.linux-x64"]),
+    Some("Microsoft.AspNetCore.App.Runtime.*"),
+    ">=3.0.0,<=3.1.24 >=5.0.0,<=5.0.16 >=6.0.0,<=6.0.4",
+    false
+)]
+#[case::synthetic_wildcard_needs_the_dot(
+    "6.0.4",
+    Some(vec!["Microsoft.AspNetCore.App.RuntimeExtras"]),
+    Some("Microsoft.AspNetCore.App.Runtime.*"),
+    ">=3.0.0,<=3.1.24 >=5.0.0,<=5.0.16 >=6.0.0,<=6.0.4",
+    false
 )]
 fn counts_only_listed_packages(
     #[case] version: &str,
