@@ -157,6 +157,9 @@ kagami matches the target version against the vulnerable version ranges of each 
   affecting the target, so check those advisories yourself.
 - A list of upper bounds such as `< 1.8.4, < 1.9.1` is read as one fix per release branch
   (`>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`).
+- A version without an operator, such as `10.0.0`, means that version only (semver alone would
+  read it as `^10.0.0`). Next to a bound whose release branch misses its other end, it is that
+  end: `>= 5.0.0, 6.0.0` is read as `>= 5.0.0, <= 6.0.0`.
 - A pre-release target such as `1.32.0-rc.2` is also checked as the release it leads to (`1.32.0`).
 
 Hand-written ranges do not always describe every release branch precisely, so read the ranges in

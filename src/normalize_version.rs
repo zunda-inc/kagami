@@ -10,7 +10,9 @@
 //! Output format: one space between an operator and its version, `, ` between the comparators of
 //! one requirement (AND) and ` || ` between alternatives (OR). A range that already parses is
 //! returned unchanged, except a list of upper bounds like `< 1.8.4, < 1.9.1`, which is read as
-//! release branches.
+//! release branches. A range with a version that has no operator goes through the rules even if
+//! it parses: `semver` reads `10.0.0` as `^10.0.0` like Cargo does, while an advisory means that
+//! version only.
 
 use crate::normalize_version_words::{
     replace_ignore_case, replace_unusual_characters, words_to_operators,
@@ -25,6 +27,7 @@ use semver::{Comparator, Op, VersionReq};
 ///   `>= 2.1.0 < 2.2.7,  >= 2.3.0 < 2.3.4`  ->  `>= 2.1.0, < 2.2.7 || >= 2.3.0, < 2.3.4`
 ///   `< 1.8.4, < 1.9.1`                     ->  `>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`
 ///   `v1.18.0,v1.18.1`                      ->  `= 1.18.0 || = 1.18.1`
+///   `10.0.0-rc.1`                          ->  `= 10.0.0-rc.1`  (parses, but as `^10.0.0-rc.1`)
 ///   `All`                                  ->  `*`
 ///   `>= 1.0.0, < 1.2.6`                    ->  `>= 1.0.0, < 1.2.6`  (already valid: unchanged)
 ///   `NONE`                                 ->  `= NONE`  (still unparsable: the caller warns)
@@ -32,7 +35,7 @@ pub fn normalize_version_range(range: impl Into<String>) -> String {
     let range = range.into();
     let original = range.clone();
 
-    if parses(&range) {
+    if parses(&range) && !has_version_without_operator(&range) {
         return upper_bound_lists_to_branches(&range);
     }
 
@@ -71,6 +74,21 @@ fn parses(range: &str) -> bool {
     range
         .split("||")
         .all(|alternative| VersionReq::parse(alternative.trim()).is_ok())
+}
+
+// Whether a comparator of the range has no operator. `semver::VersionReq` reads such a version as
+// `^` like Cargo does, so `10.0.0-rc.1` would cover every 10.x version, while an advisory means
+// that version only.
+//   `10.0.0-rc.1.25451.107`  ->  true
+//   `1.18.0, 1.18.1`         ->  true
+//   `>= 1.0.0, < 1.2.6`      ->  false
+//   `^1.2.3`                 ->  false  (a `^` that was written is meant)
+//   `*`                      ->  false
+fn has_version_without_operator(range: &str) -> bool {
+    range
+        .split("||")
+        .flat_map(|alternative| alternative.split(','))
+        .any(|comparator| comparator.trim().starts_with(|c: char| c.is_ascii_digit()))
 }
 
 // Removes a note written in parentheses.
@@ -165,12 +183,13 @@ pub fn interval_to_requirement(range: &str) -> Option<String> {
 
 // ----- one alternative (the parts between `||`) -----
 
-// Rebuilds one alternative (the text between two `||`). Comma-separated items are the comparators
-// of one requirement, unless an item is a requirement by itself (a hyphen range, a `>= a < b` pair
-// or an exact version); then the items are alternatives. A word without a digit next to real items
-// is a label and is dropped.
+// Rebuilds one alternative (the text between two `||`). The commas say little: advisories put them
+// between release branches, inside them or both. So the comparators of all comma-separated items
+// form one sequence, which `group_into_branches` cuts into branches. A word without a digit next
+// to real items is a label and is dropped.
 //   `>= 1.0.0, < 1.2.6`                                    ->  `>= 1.0.0, < 1.2.6`
 //   `>= 2.1.0 < 2.2.7, >= 2.3.0 < 2.3.4`                   ->  `>= 2.1.0, < 2.2.7 || >= 2.3.0, < 2.3.4`
+//   `>= 9.0.0, <= 9.0.13 >= 10.0.0, <= 10.0.3`             ->  `>= 9.0.0, <= 9.0.13 || >= 10.0.0, <= 10.0.3`
 //   `3.0.0-rc1 - 3.2.0-rc1, 3.1.7`                         ->  `>= 3.0.0-rc1, <= 3.2.0-rc1 || = 3.1.7`
 //   `stable <= 2.7.10, beta, tests-passed <= 2.8.0.beta8`  ->  `<= 2.7.10, <= 2.8.0-beta8`
 //   `< 1.8.4, < 1.9.1`                                     ->  `>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`
@@ -184,24 +203,13 @@ fn normalize_alternative(alternative: &str) -> String {
     let has_digit = |item: &&str| item.chars().any(|c| c.is_ascii_digit());
 
     let some_item_has_a_digit = items.iter().any(has_digit);
-    let requirements = items
+    let comparators = items
         .iter()
         .filter(|item| !some_item_has_a_digit || has_digit(item))
-        .map(|item| item_to_comparators(item))
+        .flat_map(|item| item_to_comparators(item))
         .collect::<Vec<_>>();
 
-    let every_item_is_one_comparator = requirements
-        .iter()
-        .all(|comparators| comparators.len() == 1 && !comparators[0].starts_with("= "));
-
-    if every_item_is_one_comparator {
-        return group_into_branches(requirements.into_iter().flatten().collect());
-    }
-
-    requirements
-        .into_iter()
-        .map(group_into_branches)
-        .join(" || ")
+    group_into_branches(comparators)
 }
 
 // Turns one comma-separated item into its comparators, each written as `operator version`.
@@ -342,21 +350,27 @@ fn fix_version(version: &str) -> String {
 
 // ----- release branches -----
 
-// Joins comparators into requirements. A lower bound starts a new release branch, and a list of
-// upper bounds only is read as one branch per upper bound.
+// Joins comparators into requirements. A lower bound starts a new release branch, an exact version
+// is a branch by itself, and a list of upper bounds only is read as one branch per upper bound.
+// An exact version that stands for a missing end of the branch next to it becomes that end first.
 //   [`>= 1.0.0`, `< 1.2.6`]                         ->  `>= 1.0.0, < 1.2.6`
 //   [`>= 2.1.0`, `< 2.2.7`, `>= 2.3.0`, `< 2.3.4`]  ->  `>= 2.1.0, < 2.2.7 || >= 2.3.0, < 2.3.4`
 //   [`< 3.5.3`, `>= 3.6.0`, `< 3.11.3`]             ->  `< 3.5.3 || >= 3.6.0, < 3.11.3`
 //   [`< 1.8.4`, `< 1.9.1`]                          ->  `>= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1`
+//   [`<= 1.11.14`, `<= 1.12.7`, `= 1.13.0`]         ->  `>= 1.11.0, <= 1.11.14 || >= 1.12.0, <= 1.12.7 || = 1.13.0`
+//   [`>= 5.0.0`, `= 6.0.0`]                         ->  `>= 5.0.0, <= 6.0.0`
 fn group_into_branches(comparators: Vec<String>) -> String {
     let mut branches: Vec<Vec<String>> = vec![];
+    let mut previous_is_exact = false;
 
-    for comparator in comparators {
-        let starts_new_branch = comparator.starts_with('>') && !branches.is_empty();
+    for comparator in exact_versions_to_bounds(&comparators) {
+        let is_exact = comparator.starts_with("= ");
+        let starts_new_branch = comparator.starts_with('>') || is_exact || previous_is_exact;
         if starts_new_branch || branches.is_empty() {
             branches.push(vec![]);
         }
         branches.last_mut().unwrap().push(comparator);
+        previous_is_exact = is_exact;
     }
 
     branches
@@ -366,6 +380,63 @@ fn group_into_branches(comparators: Vec<String>) -> String {
             upper_bounds_to_branches(&requirement).unwrap_or(requirement)
         })
         .join(" || ")
+}
+
+// Hand-written ranges sometimes leave out the operator at one end of a branch, so an exact version
+// next to a branch with a missing end becomes that end: right after a lower bound it is the upper
+// end, and right before an upper bound of its own release branch it is the lower end. Upper bounds
+// are often listed one per release branch, so one of another branch leaves the version exact.
+//   [`>= 5.0.0`, `= 6.0.0`]               ->  [`>= 5.0.0`, `<= 6.0.0`]
+//   [`= 1.55.0`, `< 1.55.23`]             ->  [`>= 1.55.0`, `< 1.55.23`]
+//   [`= 1.3.x`, `<= 1.3.17`]              ->  [`>= 1.3.x`, `<= 1.3.17`]
+//   [`= 16.0.21299`, `<= 15.0.21297`]     ->  [`= 16.0.21299`, `<= 15.0.21297`]  (another branch)
+//   [`< 1.4.5`, `= 1.5.0`]                ->  [`< 1.4.5`, `= 1.5.0`]
+fn exact_versions_to_bounds(comparators: &[String]) -> Vec<String> {
+    comparators
+        .iter()
+        .enumerate()
+        .map(|(index, comparator)| {
+            let version = match comparator.strip_prefix("= ") {
+                Some(version) => version,
+                None => return comparator.clone(),
+            };
+
+            let follows_lower_bound = index > 0 && comparators[index - 1].starts_with('>');
+            let precedes_upper_bound_of_branch = comparators
+                .get(index + 1)
+                .is_some_and(|next| is_upper_bound_of_branch(next, comparator));
+
+            if follows_lower_bound {
+                format!("<= {version}")
+            } else if precedes_upper_bound_of_branch {
+                format!(">= {version}")
+            } else {
+                comparator.clone()
+            }
+        })
+        .collect()
+}
+
+// Whether a comparator is an upper bound in the release branch of an exact version. An exact
+// version without a minor number, like `= 2.x`, stands for its whole major version.
+//   (`< 1.55.23`, `= 1.55.0`)          ->  true
+//   (`< 2.4.3`, `= 2.x`)               ->  true
+//   (`<= 1.11.15`, `= 1.10`)           ->  false
+//   (`<= 15.0.21297`, `= 16.0.21299`)  ->  false
+//   (`>= 1.56.0`, `= 1.55.0`)          ->  false
+fn is_upper_bound_of_branch(comparator: &str, exact_version: &str) -> bool {
+    match (
+        Comparator::parse(comparator),
+        Comparator::parse(exact_version),
+    ) {
+        (Ok(bound), Ok(exact)) => {
+            let is_upper_bound = matches!(bound.op, Op::Less | Op::LessEq);
+            let same_major = bound.major == exact.major;
+            let same_minor = exact.minor.is_none() || bound.minor == exact.minor;
+            is_upper_bound && same_major && same_minor
+        }
+        _ => false,
+    }
 }
 
 // For a range that already parses: returns it unchanged, except that a list of upper bounds is

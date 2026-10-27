@@ -35,7 +35,8 @@ fn converts_hyphen_ranges(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input), expected);
 }
 
-// 4. Missing commas between comparators; each `>= a < b` pair is a release branch
+// 4. Missing commas between comparators; a lower bound starts a release branch, also when the
+// commas sit inside the branches
 #[rstest]
 #[case::containerd(
     ">= 2.1.0 < 2.2.7,  >= 2.3.0 < 2.3.4",
@@ -45,17 +46,35 @@ fn converts_hyphen_ranges(#[case] input: &str, #[case] expected: &str) {
     ">=9.2.0 <9.2.10 >=9.3.0 <9.3.4",
     ">= 9.2.0, < 9.2.10 || >= 9.3.0, < 9.3.4"
 )]
+#[case::dotnet_runtime(
+    ">= 9.0.0, <= 9.0.13 >= 10.0.0, <= 10.0.3",
+    ">= 9.0.0, <= 9.0.13 || >= 10.0.0, <= 10.0.3"
+)]
+#[case::dotnet_runtime_empty_branch(
+    ">= 9.0.0, < 9.0.0 >= 8.0.0, < 8.0.11",
+    ">= 9.0.0, < 9.0.0 || >= 8.0.0, < 8.0.11"
+)]
+#[case::aspnetcore_no_spaces(
+    ">=3.0.0,<=3.1.24 >=5.0.0,<=5.0.16 >=6.0.0,<=6.0.4",
+    ">= 3.0.0, <= 3.1.24 || >= 5.0.0, <= 5.0.16 || >= 6.0.0, <= 6.0.4"
+)]
 fn inserts_missing_commas(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input), expected);
 }
 
-// 5. Bare versions are exact versions, and a list of them means OR
+// 5. Bare versions are exact versions, and a list of them means OR. `semver` alone would read a
+// bare version without `v` as `^`
 #[rstest]
 #[case::argo_cd("v2.1.0", "= 2.1.0")]
 #[case::argo_cd_build_metadata("v2.9.3+6eba5be", "= 2.9.3")]
 #[case::cert_manager(
     "v1.18.0,v1.18.1,v1.19.0,v1.19.1",
     "= 1.18.0 || = 1.18.1 || = 1.19.0 || = 1.19.1"
+)]
+#[case::aspnetcore_without_v("10.0.0-rc.1.25451.107", "= 10.0.0-rc.1.25451.107")]
+#[case::envoy_without_v(
+    "1.19.0, 1.18.3, 1.17.3, 1.16.4",
+    "= 1.19.0 || = 1.18.3 || = 1.17.3 || = 1.16.4"
 )]
 fn bare_versions_are_exact(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input), expected);
@@ -126,7 +145,7 @@ fn keeps_valid_ranges(#[case] range: &str) {
 #[case::jetty_build_stamp("<= 9.4.32.v20200930, <= 10.0.0.beta2", "<= 9.4.32, <= 10.0.0-beta2")]
 #[case::dotnet_four_part_versions(
     "16.0.21299.0, <= 15.0.21297.12, < = 13.1.21296.21",
-    "= 16.0.21299 || <= 15.0.21297 || <= 13.1.21296"
+    "= 16.0.21299 || >= 15.0.0, <= 15.0.21297 || >= 13.1.0, <= 13.1.21296"
 )]
 fn fixes_version_qualifiers(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input), expected);
@@ -236,6 +255,33 @@ fn inserts_missing_commas_inside_alternatives(#[case] input: &str, #[case] expec
     "<= 2.7.10, <= 2.8.0-beta8"
 )]
 fn fixes_typos_and_phrases(#[case] input: &str, #[case] expected: &str) {
+    assert_eq!(normalize_version_range(input), expected);
+}
+
+// 13. A bare version next to a branch that misses an end is that end. Next to an upper bound of
+// another release branch it stays exact, because upper bounds are often listed one per branch
+#[rstest]
+#[case::dotnet_runtime_lower_end(
+    "8.0.0-preview.1.23110.8, <= 8.0.0",
+    ">= 8.0.0-preview.1.23110.8, <= 8.0.0"
+)]
+#[case::metabase_lower_end("1.55.0, < 1.55.23", ">= 1.55.0, < 1.55.23")]
+#[case::netty_lower_end("4.1.91.Final =< 4.1.117.Final", ">= 4.1.91, <= 4.1.117")]
+#[case::harbor_partial_lower_ends("2.x < 2.4.3; 2.5<2.5.2", ">= 2.x, < 2.4.3 || >= 2.5, < 2.5.2")]
+#[case::aspnetcore_upper_ends(
+    ">=5.0.0,6.0.0, >=4.6.0, 4.7.0",
+    ">= 5.0.0, <= 6.0.0 || >= 4.6.0, <= 4.7.0"
+)]
+#[case::cilium_other_branch(
+    "1.7, 1.8, 1.9, 1.10, <=1.11.15, <= 1.12.8, <= 1.13.1",
+    "= 1.7 || = 1.8 || = 1.9 || = 1.10 || >= 1.11.0, <= 1.11.15 || >= 1.12.0, <= 1.12.8 || >= 1.13.0, <= 1.13.1"
+)]
+#[case::git_other_branches(
+    "v2.48.0 <=v2.47.1 <=v2.46.2",
+    "= 2.48.0 || >= 2.47.0, <= 2.47.1 || >= 2.46.0, <= 2.46.2"
+)]
+#[case::containerd_after_upper_bound("< 1.4.12, 1.5.0, 1.5.1", "< 1.4.12 || = 1.5.0 || = 1.5.1")]
+fn reads_bare_versions_next_to_bounds(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input), expected);
 }
 
