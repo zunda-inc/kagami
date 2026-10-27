@@ -84,13 +84,16 @@ mix with the output.
 
 ### Targets
 
-| Field             | Required                | Description                                                                                                                       |
-|-------------------|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| `advisory_type`   | Yes                     | Where to look for advisories: `github` or `github_repository` (see below).                                                        |
-| `version`         | Yes                     | The version you run, as a full semantic version like `1.29.0`. `1.29` and `v1.29.0` are rejected.                                 |
-| `name`            | For `github`            | The package name in the GitHub Advisory Database, like `k8s.io/kubernetes`. With `github_repository` it is only the display name. |
-| `ecosystem`       | No                      | Limits the `github` search to one ecosystem, like `go`, `npm` or `pip`.                                                           |
-| `repository_path` | For `github_repository` | The repository that publishes the advisories, as `owner/repo`.                                                                    |
+| Field                        | Required                | Description                                                                                                                       |
+|------------------------------|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| `advisory_type`              | Yes                     | Where to look for advisories: `github` or `github_repository` (see below).                                                        |
+| `version`                    | Yes                     | The version you run, as a full semantic version like `1.29.0`. `1.29` and `v1.29.0` are rejected.                                 |
+| `name`                       | For `github`            | The package name in the GitHub Advisory Database, like `k8s.io/kubernetes`. With `github_repository` it is only the display name. |
+| `ecosystem`                  | No                      | Limits the `github` search to one ecosystem, like `go`, `npm` or `pip`.                                                           |
+| `repository_path`            | For `github_repository` | The repository that publishes the advisories, as `owner/repo`.                                                                    |
+| `packages`                   | No                      | Only the advisory entries of these packages count, like `Microsoft.NETCore.App.Runtime.linux-x64` (see below).                    |
+| `ignore`                     | No                      | GHSA or CVE IDs of the advisories to leave out for this target, like `GHSA-4789-qfc9-5f9q`.                                       |
+| `ignore_before_published_at` | No                      | Leaves out the advisories published before this time, like `2026-08-27T01:18:49Z` (see below).                                    |
 
 ### `github` or `github_repository`
 
@@ -103,6 +106,54 @@ mix with the output.
   own GitHub repository. Use it for software that is not in the database, such as the PHP
   interpreter (`php/php-src`) or Envoy Gateway (`envoyproxy/gateway`). New advisories also show up
   here before GitHub has reviewed them into the database.
+
+> [!NOTE]
+> When the tags of a project are not versions of its Go module, the database writes the ranges of
+> the module with pseudo-versions such as `0.0.0-20260303131938-204dbb2e3ff7`. Dex
+> (`github.com/dexidp/dex`, tagged `v2.x.y` without `/v2`) is one of them. No release is inside
+> such a range, so check that kind of software with `github_repository`.
+
+### Narrowing down the results
+
+Some projects list many packages in one advisory, each with its own platform or version scheme:
+an advisory of .NET can name `Microsoft.NETCore.App.Runtime.win-x64` and
+`aspnetcorev2_inprocess.dll` next to the runtime you use. With `packages`, only the entries of the
+listed packages decide whether an advisory affects the target. Names are compared ignoring case,
+and an entry named `Microsoft.AspNetCore.App.Runtime.*` covers every name after the dot. An entry
+without a package name always counts.
+
+```yaml
+targets:
+  - name: .NET Runtime
+    version: 10.0.14
+    advisory_type: github_repository
+    repository_path: dotnet/runtime
+    packages: [Microsoft.NETCore.App.Runtime.linux-x64]
+```
+
+`ignore` lists the advisories that you have checked by hand. They are left out of the output and
+of `fail_on_severity` for that target. Write the IDs as the advisory does, like
+`GHSA-4789-qfc9-5f9q` or `CVE-2025-49844`.
+
+Some projects, such as Envoy and Redis, give one range for every release branch and write the fix
+of each branch only in the patched versions, which kagami does not use to decide. Set
+`ignore_before_published_at` to the release time of the version you run, and kagami leaves out the
+advisories published before it, as that release already has their fixes. An advisory that names
+no fixed version for the packages of the target, like `TBD`, is still reported.
+
+```yaml
+targets:
+  - name: envoy
+    version: 1.39.1
+    advisory_type: github_repository
+    repository_path: envoyproxy/envoy
+    ignore_before_published_at: 2026-08-27T01:18:49Z
+```
+
+> [!IMPORTANT]
+> `ignore_before_published_at` takes a time with its time zone. A date alone is rejected. Update
+> it when you upgrade, and never set it later than the release you run, or advisories that affect
+> you are left out as well.
 
 ### Other settings
 
@@ -169,6 +220,8 @@ kagami matches the target version against the vulnerable version ranges of each 
   version with a dot follows it; otherwise it belongs to the version, as in `10.0.0-rc.1` or
   `7.1.1-4`.
 - A pre-release target such as `1.32.0-rc.2` is also checked as the release it leads to (`1.32.0`).
+  With `github`, GitHub picks the advisories for the exact version first, so a pre-release can get
+  fewer advisories than its release.
 
 Hand-written ranges do not always describe every release branch precisely, so read the ranges in
 the output before acting on them.
