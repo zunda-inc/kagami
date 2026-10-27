@@ -257,10 +257,21 @@ pub fn is_target_version_for_vulnerabilities(
 
     vulnerabilities.iter().any(|v| {
         if let Some(target_packages) = target_packages {
+            let target_packages = target_packages
+                .iter()
+                .map(|p| p.to_lowercase())
+                .collect::<Vec<_>>();
             let is_target_package = v.package
                 .as_ref()
                 .and_then(|p| p.name.as_ref())
-                .and_then(|n| Some(target_packages.contains(n)));
+                .and_then(|n| {
+                    if n.contains(".*") {
+                        let asterisk_name = n.to_lowercase().replace(".*", "");
+                        return Some(target_packages.iter().any(|p| p.starts_with(&asterisk_name)))
+                    }
+
+                    Some(target_packages.contains(&n.to_lowercase()))
+                });
 
             // It's not in target package
             if is_target_package == Some(false) {

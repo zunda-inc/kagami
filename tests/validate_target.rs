@@ -59,6 +59,9 @@ fn rejects_invalid_targets(#[case] yaml: &str, #[case] expected: &str) {
 #[case::prerelease_version(
     "{ name: k8s.io/kubernetes, version: 1.33.0-rc.1, advisory_type: github }"
 )]
+#[case::packages_and_ignore(
+    "{ version: 10.0.14, advisory_type: github_repository, repository_path: dotnet/runtime, packages: [Microsoft.NETCore.App.Runtime.linux-x64], ignore: [GHSA-4mpw-cpwj-hxxj, CVE-2026-26127] }"
+)]
 fn accepts_valid_targets(#[case] yaml: &str) {
     let target: Target = yaml_serde::from_str(yaml).unwrap();
 
