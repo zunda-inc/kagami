@@ -132,6 +132,11 @@ fn process_advisory_type_github(
             continue;
         }
 
+        if Some(advisory.published_at) < target.ignore_before_published_date {
+            trace!("`{:?}` is before the ignore date.", advisory.published_at);
+            continue;
+        }
+
         let vulnerabilities = match &advisory.vulnerabilities {
             Some(v) => v,
             None => {
@@ -197,6 +202,11 @@ fn process_advisory_type_github_repository(
 
         if target_ignore_list.contains(&advisory.ghsa_id) {
             trace!("`{}` is in the ignore list.", advisory.ghsa_id);
+            continue;
+        }
+
+        if Some(advisory.published_at) < Some(target.ignore_before_published_date) {
+            trace!("`{:?}` is before the ignore date.", advisory.published_at);
             continue;
         }
 
