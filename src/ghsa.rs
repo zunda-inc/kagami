@@ -132,11 +132,6 @@ fn process_advisory_type_github(
             continue;
         }
 
-        if Some(advisory.published_at) < target.ignore_before_published_at {
-            trace!("`{:?}` is before the ignore date.", advisory.published_at);
-            continue;
-        }
-
         let vulnerabilities = match &advisory.vulnerabilities {
             Some(v) => v,
             None => {
@@ -147,6 +142,13 @@ fn process_advisory_type_github(
                 continue;
             }
         };
+
+        if Some(advisory.published_at) < target.ignore_before_published_at
+            && has_any_patched_version(&vulnerabilities)
+        {
+            trace!("`{:?}` is before the ignore date.", advisory.published_at);
+            continue;
+        }
 
         if !is_target_version_for_vulnerabilities(
             &advisory.ghsa_id,
@@ -205,11 +207,6 @@ fn process_advisory_type_github_repository(
             continue;
         }
 
-        if Some(advisory.published_at) < Some(target.ignore_before_published_at) {
-            trace!("`{:?}` is before the ignore date.", advisory.published_at);
-            continue;
-        }
-
         let vulnerabilities = match &advisory.vulnerabilities {
             Some(v) => v,
             None => {
@@ -220,6 +217,13 @@ fn process_advisory_type_github_repository(
                 continue;
             }
         };
+
+        if Some(advisory.published_at) < Some(target.ignore_before_published_at)
+            && has_any_patched_version(&vulnerabilities)
+        {
+            trace!("`{:?}` is before the ignore date.", advisory.published_at);
+            continue;
+        }
 
         if !is_target_version_for_vulnerabilities(
             &advisory.ghsa_id,
@@ -252,6 +256,15 @@ fn process_advisory_type_github_repository(
             .sorted_by_key(|a| a.severity.order())
             .cloned()
             .collect(),
+    })
+}
+
+pub fn has_any_patched_version(
+    vulnerabilities: &[octocrab::models::security_advisories::Vulnerability],
+) -> bool {
+    vulnerabilities.iter().any(|v| match &v.patched_versions {
+        Some(p) => p.len() > 4,
+        None => false,
     })
 }
 
