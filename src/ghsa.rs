@@ -121,11 +121,11 @@ fn process_advisory_type_github(
     };
 
     for advisory in results {
-        if let Some(cve_id) = &advisory.cve_id {
-            if target_ignore_list.contains(cve_id) {
-                trace!("`{}` is in the ignore list.", cve_id);
-                continue;
-            }
+        if let Some(cve_id) = &advisory.cve_id
+            && target_ignore_list.contains(cve_id)
+        {
+            trace!("`{}` is in the ignore list.", cve_id);
+            continue;
         }
 
         if target_ignore_list.contains(&advisory.ghsa_id) {
@@ -145,7 +145,7 @@ fn process_advisory_type_github(
         };
 
         if Some(advisory.published_at) < target.ignore_before_published_at
-            && has_any_patched_version(&target.packages, &vulnerabilities)
+            && has_any_patched_version(&target.packages, vulnerabilities)
         {
             trace!("`{:?}` is before the ignore date.", advisory.published_at);
             continue;
@@ -196,11 +196,11 @@ fn process_advisory_type_github_repository(
     };
 
     for advisory in results {
-        if let Some(cve_id) = &advisory.cve_id {
-            if target_ignore_list.contains(cve_id) {
-                trace!("`{}` is in the ignore list.", cve_id);
-                continue;
-            }
+        if let Some(cve_id) = &advisory.cve_id
+            && target_ignore_list.contains(cve_id)
+        {
+            trace!("`{}` is in the ignore list.", cve_id);
+            continue;
         }
 
         if target_ignore_list.contains(&advisory.ghsa_id) {
@@ -220,7 +220,7 @@ fn process_advisory_type_github_repository(
         };
 
         if Some(advisory.published_at) < Some(target.ignore_before_published_at)
-            && has_any_patched_version(&target.packages, &vulnerabilities)
+            && has_any_patched_version(&target.packages, vulnerabilities)
         {
             trace!("`{:?}` is before the ignore date.", advisory.published_at);
             continue;
@@ -297,17 +297,15 @@ pub fn is_target_package(
             .package
             .as_ref()
             .and_then(|p| p.name.as_ref())
-            .and_then(|n| {
+            .map(|n| {
                 if n.contains(".*") {
                     let asterisk_name = n.to_lowercase().replace(".*", ".");
-                    return Some(
-                        target_packages
-                            .iter()
-                            .any(|p| p.starts_with(&asterisk_name)),
-                    );
+                    return target_packages
+                        .iter()
+                        .any(|p| p.starts_with(&asterisk_name));
                 }
 
-                Some(target_packages.contains(&n.to_lowercase()))
+                target_packages.contains(&n.to_lowercase())
             });
 
         // It's not in target package
