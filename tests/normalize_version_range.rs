@@ -23,7 +23,8 @@ fn all_means_every_version(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input), expected);
 }
 
-// 3. Hyphen ranges; comma-separated items are release branches, so they mean OR
+// 3. Hyphen ranges, also without spaces when a version with a dot follows the hyphen;
+// comma-separated items are release branches, so they mean OR
 #[rstest]
 #[case::argo_cd("3.2.0 - 3.3.8", ">= 3.2.0, <= 3.3.8")]
 #[case::grafana("6.3.0-beta1 - 9.3.1", ">= 6.3.0-beta1, <= 9.3.1")]
@@ -31,11 +32,20 @@ fn all_means_every_version(#[case] input: &str, #[case] expected: &str) {
     "7.3.27 - 7.3.33, 7.4.15 - 7.4.33, 8.0.2 - 8.0.30, 8.1.0 - 8.1.28",
     ">= 7.3.27, <= 7.3.33 || >= 7.4.15, <= 7.4.33 || >= 8.0.2, <= 8.0.30 || >= 8.1.0, <= 8.1.28"
 )]
+#[case::libgit2_without_spaces("1.9.0-1.9.6", ">= 1.9.0, <= 1.9.6")]
+#[case::squid_without_spaces("5.0.3-5.9, 6.0-6.3", ">= 5.0.3, <= 5.9 || >= 6.0, <= 6.3")]
+#[case::containerd_without_spaces("<= 1.5.17, 1.6.0-1.6.17", "<= 1.5.17 || >= 1.6.0, <= 1.6.17")]
+#[case::jetty_qualifier_without_spaces(
+    "7.2.2-9.4.38, 10.0.0.alpha0-10.0.1",
+    ">= 7.2.2, <= 9.4.38 || >= 10.0.0-alpha0, <= 10.0.1"
+)]
+#[case::imagemagick_patch_level_stays("7.1.1-4,7.1.1-6 (Beta)", "= 7.1.1-4 || = 7.1.1-6")]
 fn converts_hyphen_ranges(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input), expected);
 }
 
-// 4. Missing commas between comparators; each `>= a < b` pair is a release branch
+// 4. Missing commas between comparators; a lower bound starts a release branch, also when the
+// commas sit inside the branches
 #[rstest]
 #[case::containerd(
     ">= 2.1.0 < 2.2.7,  >= 2.3.0 < 2.3.4",
@@ -45,11 +55,24 @@ fn converts_hyphen_ranges(#[case] input: &str, #[case] expected: &str) {
     ">=9.2.0 <9.2.10 >=9.3.0 <9.3.4",
     ">= 9.2.0, < 9.2.10 || >= 9.3.0, < 9.3.4"
 )]
+#[case::dotnet_runtime(
+    ">= 9.0.0, <= 9.0.13 >= 10.0.0, <= 10.0.3",
+    ">= 9.0.0, <= 9.0.13 || >= 10.0.0, <= 10.0.3"
+)]
+#[case::dotnet_runtime_empty_branch(
+    ">= 9.0.0, < 9.0.0 >= 8.0.0, < 8.0.11",
+    ">= 9.0.0, < 9.0.0 || >= 8.0.0, < 8.0.11"
+)]
+#[case::aspnetcore_no_spaces(
+    ">=3.0.0,<=3.1.24 >=5.0.0,<=5.0.16 >=6.0.0,<=6.0.4",
+    ">= 3.0.0, <= 3.1.24 || >= 5.0.0, <= 5.0.16 || >= 6.0.0, <= 6.0.4"
+)]
 fn inserts_missing_commas(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input), expected);
 }
 
-// 5. Bare versions are exact versions, and a list of them means OR
+// 5. Bare versions are exact versions, and a list of them means OR. `semver` alone would read a
+// bare version without `v` as `^`
 #[rstest]
 #[case::argo_cd("v2.1.0", "= 2.1.0")]
 #[case::argo_cd_build_metadata("v2.9.3+6eba5be", "= 2.9.3")]
@@ -57,13 +80,29 @@ fn inserts_missing_commas(#[case] input: &str, #[case] expected: &str) {
     "v1.18.0,v1.18.1,v1.19.0,v1.19.1",
     "= 1.18.0 || = 1.18.1 || = 1.19.0 || = 1.19.1"
 )]
+#[case::aspnetcore_without_v("10.0.0-rc.1.25451.107", "= 10.0.0-rc.1.25451.107")]
+#[case::envoy_without_v(
+    "1.19.0, 1.18.3, 1.17.3, 1.16.4",
+    "= 1.19.0 || = 1.18.3 || = 1.17.3 || = 1.16.4"
+)]
+#[case::envoy_without_v_or_spaces(
+    "1.37.0,1.36.4,1.35.8,1.34.12",
+    "= 1.37.0 || = 1.36.4 || = 1.35.8 || = 1.34.12"
+)]
 fn bare_versions_are_exact(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input), expected);
 }
 
-// Upper bounds of several branches in one entry mean OR, each with its own branch as lower bound
+// Upper bounds of several branches in one entry mean OR. Each bound but the lowest leaves out the
+// listed branches below it, while the versions before the lowest bound and the minor versions the
+// list skips stay inside, as they never got the fix
 #[rstest]
-#[case::envoy_gateway("< 1.8.4, < 1.9.1", ">= 1.8.0, < 1.8.4 || >= 1.9.0, < 1.9.1")]
+#[case::envoy_gateway("< 1.8.4, < 1.9.1", "< 1.8.4 || >= 1.9.0, < 1.9.1")]
+#[case::quarkus_lts_branches(
+    "<3.20.6, <3.27.3, <3.33.1, <3.35.1",
+    "< 3.20.6 || >= 3.21.0, < 3.27.3 || >= 3.28.0, < 3.33.1 || >= 3.34.0, < 3.35.1"
+)]
+#[case::opensearch_new_major("<1.3.7; <2.4.0", "< 1.3.7 || >= 2.0.0, < 2.4.0")]
 #[case::php_src_single_upper_bound_stays("<8.4.26", "<8.4.26")]
 fn splits_upper_bounds_into_branches(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input), expected);
@@ -116,17 +155,14 @@ fn keeps_valid_ranges(#[case] range: &str) {
 // 6. Qualifiers after the patch number (Maven, Discourse, PEP 440)
 #[rstest]
 #[case::netty_final(">=4.2.0.Final, <=4.2.14.Final", ">= 4.2.0, <= 4.2.14")]
-#[case::netty_two_branches(
-    "<=4.2.12.Final, <=4.1.132.Final",
-    ">= 4.2.0, <= 4.2.12 || >= 4.1.0, <= 4.1.132"
-)]
+#[case::netty_two_branches("<=4.2.12.Final, <=4.1.132.Final", ">= 4.2.0, <= 4.2.12 || <= 4.1.132")]
 #[case::jetty_alpha_beta(">=12.1.0.alpha0, <=12.1.0.beta2", ">= 12.1.0-alpha0, <= 12.1.0-beta2")]
 #[case::vllm_pep440(">= 0.23.0rc2, < 0.30.0", ">= 0.23.0-0rc2, < 0.30.0")]
 #[case::clickhouse_fourth_number("< 24.3.18.6", "< 24.3.18")]
 #[case::jetty_build_stamp("<= 9.4.32.v20200930, <= 10.0.0.beta2", "<= 9.4.32, <= 10.0.0-beta2")]
 #[case::dotnet_four_part_versions(
     "16.0.21299.0, <= 15.0.21297.12, < = 13.1.21296.21",
-    "= 16.0.21299 || <= 15.0.21297 || <= 13.1.21296"
+    "= 16.0.21299 || >= 15.0.0, <= 15.0.21297 || <= 13.1.21296"
 )]
 fn fixes_version_qualifiers(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input), expected);
@@ -150,18 +186,18 @@ fn drops_labels_and_semicolons(#[case] input: &str, #[case] expected: &str) {
 #[case::envoy_capital_v("V1.21.0 and earlier", "<= 1.21.0")]
 #[case::envoy_or_older(
     "1.14.2, 1.13.2, 1.12.4 or older",
-    ">= 1.14.0, <= 1.14.2 || >= 1.13.0, <= 1.13.2 || >= 1.12.0, <= 1.12.4"
+    ">= 1.14.0, <= 1.14.2 || >= 1.13.0, <= 1.13.2 || <= 1.12.4"
 )]
 #[case::valkey_and_below(
     "7.2.10 and below, 8.0.5 and below, 8.1.3 and below",
-    ">= 7.2.0, <= 7.2.10 || >= 8.0.0, <= 8.0.5 || >= 8.1.0, <= 8.1.3"
+    "<= 7.2.10 || >= 8.0.0, <= 8.0.5 || >= 8.1.0, <= 8.1.3"
 )]
 #[case::redis_or_newer("6.2 or newer", ">= 6.2")]
 #[case::caddy_and_later("v2.4.0 and later", ">= 2.4.0")]
 #[case::rancher_plus("2.0.0+", ">= 2.0.0")]
 #[case::argo_cd_prior_to(
     "All versions prior to 1.7.14 and 1.8.7",
-    ">= 1.7.0, < 1.7.14 || >= 1.8.0, < 1.8.7"
+    "< 1.7.14 || >= 1.8.0, < 1.8.7"
 )]
 #[case::envoy_list_with_and(
     "1.17.1, 1.16.2, 1.15.3, and 1.14.6",
@@ -195,7 +231,7 @@ fn turns_words_into_ranges(#[case] input: &str, #[case] expected: &str) {
 #[rstest]
 #[case::ghost_double_ampersand(">= 6.19.4 && < 6.21.1", ">= 6.19.4, < 6.21.1")]
 #[case::kyverno_and(">= 1.18.0 and <= 1.19.1", ">= 1.18.0, <= 1.19.1")]
-#[case::etcd_and_upper_bounds("< v3.4.26 and < v3.5.9", ">= 3.4.0, < 3.4.26 || >= 3.5.0, < 3.5.9")]
+#[case::etcd_and_upper_bounds("< v3.4.26 and < v3.5.9", "< 3.4.26 || >= 3.5.0, < 3.5.9")]
 #[case::prometheus_semicolon("< 3.5.3 ; >= 3.6.0 and <3.11.3", "< 3.5.3 || >= 3.6.0, < 3.11.3")]
 #[case::ghost_unicode("≤ 5.59.0", "<= 5.59.0")]
 #[case::kyverno_markdown_escape("\\>= 1.11.0, \\<= 1.16.2", ">= 1.11.0, <= 1.16.2")]
@@ -226,16 +262,40 @@ fn inserts_missing_commas_inside_alternatives(#[case] input: &str, #[case] expec
 #[case::valkey_reversed_operator("=>9.0.0, <= 9.0.2", ">= 9.0.0, <= 9.0.2")]
 #[case::envoy_and_before("1.12.6 and before.", "<= 1.12.6")]
 #[case::synthetic_through_and_including("1.0.0 through and including 1.2.3", ">= 1.0.0, <= 1.2.3")]
-#[case::docker_calendar_versions(
-    "< 19.03.15, < 20.10.3",
-    ">= 19.3.0, < 19.3.15 || >= 20.10.0, < 20.10.3"
-)]
+#[case::docker_calendar_versions("< 19.03.15, < 20.10.3", "< 19.3.15 || >= 20.0.0, < 20.10.3")]
 #[case::vllm_leading_zero("< 030.0", "< 30.0.0")]
 #[case::discourse_comma_inside_label(
     "stable <= 2.7.10; beta,tests-passed <= 2.8.0.beta8;",
     "<= 2.7.10, <= 2.8.0-beta8"
 )]
 fn fixes_typos_and_phrases(#[case] input: &str, #[case] expected: &str) {
+    assert_eq!(normalize_version_range(input), expected);
+}
+
+// 13. A bare version next to a branch that misses an end is that end. Next to an upper bound of
+// another release branch it stays exact, because upper bounds are often listed one per branch
+#[rstest]
+#[case::dotnet_runtime_lower_end(
+    "8.0.0-preview.1.23110.8, <= 8.0.0",
+    ">= 8.0.0-preview.1.23110.8, <= 8.0.0"
+)]
+#[case::metabase_lower_end("1.55.0, < 1.55.23", ">= 1.55.0, < 1.55.23")]
+#[case::netty_lower_end("4.1.91.Final =< 4.1.117.Final", ">= 4.1.91, <= 4.1.117")]
+#[case::harbor_partial_lower_ends("2.x < 2.4.3; 2.5<2.5.2", ">= 2.x, < 2.4.3 || >= 2.5, < 2.5.2")]
+#[case::aspnetcore_upper_ends(
+    ">=5.0.0,6.0.0, >=4.6.0, 4.7.0",
+    ">= 5.0.0, <= 6.0.0 || >= 4.6.0, <= 4.7.0"
+)]
+#[case::cilium_other_branch(
+    "1.7, 1.8, 1.9, 1.10, <=1.11.15, <= 1.12.8, <= 1.13.1",
+    "= 1.7 || = 1.8 || = 1.9 || = 1.10 || <= 1.11.15 || >= 1.12.0, <= 1.12.8 || >= 1.13.0, <= 1.13.1"
+)]
+#[case::git_other_branches(
+    "v2.48.0 <=v2.47.1 <=v2.46.2",
+    "= 2.48.0 || >= 2.47.0, <= 2.47.1 || <= 2.46.2"
+)]
+#[case::containerd_after_upper_bound("< 1.4.12, 1.5.0, 1.5.1", "< 1.4.12 || = 1.5.0 || = 1.5.1")]
+fn reads_bare_versions_next_to_bounds(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(normalize_version_range(input), expected);
 }
 

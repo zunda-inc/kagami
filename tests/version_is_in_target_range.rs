@@ -13,6 +13,8 @@ use rstest::rstest;
 #[case::redis_below_partial_lower_bound("7.1.9", ">= 7.2", false)]
 #[case::argo_cd_through_is_inclusive("1.8.7", "1.2.0 through 1.8.7", true)]
 #[case::argo_cd_after_through("1.8.8", "1.2.0 through 1.8.7", false)]
+#[case::libgit2_hyphen_without_spaces("1.9.3", "1.9.0-1.9.6", true)]
+#[case::libgit2_after_hyphen_without_spaces("1.9.7", "1.9.0-1.9.6", false)]
 fn checks_bounds(#[case] version: &str, #[case] range: &str, #[case] expected: bool) {
     assert_eq!(
         version_is_in_target_range(version, range).unwrap(),
@@ -37,6 +39,9 @@ fn checks_bounds(#[case] version: &str, #[case] range: &str, #[case] expected: b
 )]
 #[case::cert_manager_listed("1.19.1", "v1.18.0,v1.18.1,v1.19.0,v1.19.1", true)]
 #[case::cert_manager_not_listed("1.18.2", "v1.18.0,v1.18.1,v1.19.0,v1.19.1", false)]
+#[case::dotnet_runtime_first_branch("9.0.13", ">= 9.0.0, <= 9.0.13 >= 10.0.0, <= 10.0.3", true)]
+#[case::dotnet_runtime_second_branch("10.0.3", ">= 9.0.0, <= 9.0.13 >= 10.0.0, <= 10.0.3", true)]
+#[case::dotnet_runtime_patched("10.0.14", ">= 9.0.0, <= 9.0.13 >= 10.0.0, <= 10.0.3", false)]
 fn matches_any_alternative(#[case] version: &str, #[case] range: &str, #[case] expected: bool) {
     assert_eq!(
         version_is_in_target_range(version, range).unwrap(),
@@ -45,12 +50,19 @@ fn matches_any_alternative(#[case] version: &str, #[case] range: &str, #[case] e
 }
 
 // 3. Upper bounds of several release branches in one entry: each bound covers its own branch, so
-// 1.9.0 is affected although it is not below 1.8.4
+// 1.9.0 is affected although it is not below 1.8.4. Branches before the lowest bound and the minor
+// versions the list skips never got the fix, so they stay affected
 #[rstest]
 #[case::envoy_gateway_older_branch("1.8.3", "< 1.8.4, < 1.9.1", true)]
 #[case::envoy_gateway_newer_branch("1.9.0", "< 1.8.4, < 1.9.1", true)]
 #[case::envoy_gateway_older_branch_patched("1.8.4", "< 1.8.4, < 1.9.1", false)]
 #[case::envoy_gateway_newer_branch_patched("1.9.1", "< 1.8.4, < 1.9.1", false)]
+#[case::envoy_gateway_branch_without_fix("1.7.5", "< 1.8.4, < 1.9.1", true)]
+#[case::argo_cd_branch_without_fix("1.6.2", "All versions prior to 1.7.12 and 1.8.4", true)]
+#[case::quarkus_skipped_branch("3.25.1", "<3.20.6, <3.27.3, <3.33.1, <3.35.1", true)]
+#[case::quarkus_lts_patched("3.27.3", "<3.20.6, <3.27.3, <3.33.1, <3.35.1", false)]
+#[case::opensearch_new_major_before_its_fix("2.3.0", "<1.3.7; <2.4.0", true)]
+#[case::opensearch_new_major_patched("2.4.0", "<1.3.7; <2.4.0", false)]
 fn reads_upper_bounds_as_branches(
     #[case] version: &str,
     #[case] range: &str,
@@ -66,6 +78,9 @@ fn reads_upper_bounds_as_branches(
 #[rstest]
 #[case::argo_cd_build_metadata("2.9.3", "v2.9.3+6eba5be", true)]
 #[case::argo_cd_next_patch("2.9.4", "v2.9.3+6eba5be", false)]
+#[case::aspnetcore_without_v("10.0.0-rc.1.25451.107", "10.0.0-rc.1.25451.107", true)]
+#[case::aspnetcore_without_v_later_patch("10.0.14", "10.0.0-rc.1.25451.107", false)]
+#[case::envoy_list_without_v_later_patch("1.39.1", "1.37.0,1.36.4,1.35.8,1.34.12", false)]
 #[case::redis_all("8.2.1", "All", true)]
 fn matches_exact_and_every_version(
     #[case] version: &str,
@@ -118,6 +133,25 @@ fn judges_prerelease_as_its_release(
 #[case::runc_after_named_prereleases("1.5.0-rc.3", ">= 1.5.0-rc.1, <= 1.5.0-rc.2", false)]
 #[case::express_named_prerelease("5.0.0-beta.1", ">=5.0.0-alpha.1, <5.0.0-beta.3", true)]
 fn compares_named_prereleases(#[case] version: &str, #[case] range: &str, #[case] expected: bool) {
+    assert_eq!(
+        version_is_in_target_range(version, range).unwrap(),
+        expected
+    );
+}
+
+// 8. A bare version next to a branch that misses an end is that end, so the branch does not reach
+// every older or newer version
+#[rstest]
+#[case::metabase_inside("1.55.22", "1.55.0, < 1.55.23", true)]
+#[case::metabase_older_branch("1.54.9", "1.55.0, < 1.55.23", false)]
+#[case::aspnetcore_at_upper_end("6.0.0", ">=5.0.0,6.0.0, >=4.6.0, 4.7.0", true)]
+#[case::aspnetcore_patched("6.0.1", ">=5.0.0,6.0.0, >=4.6.0, 4.7.0", false)]
+#[case::aspnetcore_newer_major("10.0.14", ">=5.0.0,6.0.0, >=4.6.0, 4.7.0", false)]
+fn reads_bare_versions_as_missing_ends(
+    #[case] version: &str,
+    #[case] range: &str,
+    #[case] expected: bool,
+) {
     assert_eq!(
         version_is_in_target_range(version, range).unwrap(),
         expected

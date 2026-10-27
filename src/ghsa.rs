@@ -2,12 +2,14 @@ use crate::advisory::{
     Advisory, CvssScore, CvssSeverities, Epss, Package, Severity, TargetWithAdvisory, Vulnerability,
 };
 use crate::error::KagamiError;
+use crate::ghsa_workaround::{PatchedSecurityAdvisoriesHandler, PatchedSecurityAdvisory};
 use crate::normalize_version::normalize_version_range;
 use crate::{AdvisoryType, Target};
 use itertools::Itertools;
 use log::{debug, info, trace, warn};
 use octocrab::Octocrab;
 use octocrab::models::security_advisories as gh;
+use regex::Regex;
 use semver::{Prerelease, Version, VersionReq};
 use std::error::Error;
 
@@ -36,7 +38,7 @@ pub async fn find_vulnerabilities(
                     target.ecosystem.as_deref().unwrap_or("any")
                 );
 
-                let security_advisories_query = octocrab.security_advisories();
+                let security_advisories_query = PatchedSecurityAdvisoriesHandler::new(octocrab);
                 let mut query = security_advisories_query
                     .list()
                     .affects(target_name.clone());
@@ -110,11 +112,27 @@ pub async fn find_vulnerabilities(
 
 fn process_advisory_type_github(
     target: &Target,
-    results: &Vec<gh::SecurityAdvisory>,
+    results: &Vec<PatchedSecurityAdvisory>,
 ) -> Result<TargetWithAdvisory, Box<dyn Error>> {
     let mut mapped_advisories: Vec<Advisory> = vec![];
+    let target_ignore_list = match &target.ignore {
+        Some(s) => s,
+        None => &vec![],
+    };
 
     for advisory in results {
+        if let Some(cve_id) = &advisory.cve_id
+            && target_ignore_list.contains(cve_id)
+        {
+            trace!("`{}` is in the ignore list.", cve_id);
+            continue;
+        }
+
+        if target_ignore_list.contains(&advisory.ghsa_id) {
+            trace!("`{}` is in the ignore list.", advisory.ghsa_id);
+            continue;
+        }
+
         let vulnerabilities = match &advisory.vulnerabilities {
             Some(v) => v,
             None => {
@@ -126,9 +144,17 @@ fn process_advisory_type_github(
             }
         };
 
+        if Some(advisory.published_at) < target.ignore_before_published_at
+            && has_any_patched_version(&target.packages, vulnerabilities)
+        {
+            trace!("`{:?}` is before the ignore date.", advisory.published_at);
+            continue;
+        }
+
         if !is_target_version_for_vulnerabilities(
             &advisory.ghsa_id,
             &target.version,
+            &target.packages,
             vulnerabilities,
         ) {
             trace!(
@@ -164,8 +190,24 @@ fn process_advisory_type_github_repository(
     results: &Vec<gh::RepositoryAdvisory>,
 ) -> Result<TargetWithAdvisory, Box<dyn Error>> {
     let mut mapped_advisories: Vec<Advisory> = vec![];
+    let target_ignore_list = match &target.ignore {
+        Some(s) => s,
+        None => &vec![],
+    };
 
     for advisory in results {
+        if let Some(cve_id) = &advisory.cve_id
+            && target_ignore_list.contains(cve_id)
+        {
+            trace!("`{}` is in the ignore list.", cve_id);
+            continue;
+        }
+
+        if target_ignore_list.contains(&advisory.ghsa_id) {
+            trace!("`{}` is in the ignore list.", advisory.ghsa_id);
+            continue;
+        }
+
         let vulnerabilities = match &advisory.vulnerabilities {
             Some(v) => v,
             None => {
@@ -177,9 +219,17 @@ fn process_advisory_type_github_repository(
             }
         };
 
+        if Some(advisory.published_at) < Some(target.ignore_before_published_at)
+            && has_any_patched_version(&target.packages, vulnerabilities)
+        {
+            trace!("`{:?}` is before the ignore date.", advisory.published_at);
+            continue;
+        }
+
         if !is_target_version_for_vulnerabilities(
             &advisory.ghsa_id,
             &target.version,
+            &target.packages,
             vulnerabilities,
         ) {
             trace!(
@@ -210,15 +260,81 @@ fn process_advisory_type_github_repository(
     })
 }
 
+pub fn has_any_patched_version(
+    target_packages: &Option<Vec<String>>,
+    vulnerabilities: &[octocrab::models::security_advisories::Vulnerability],
+) -> bool {
+    let number_regex = Regex::new("[0-9]").expect("Regex parse failure");
+    let vulnerabilities = vulnerabilities
+        .iter()
+        .filter(|v| is_target_package(target_packages, v))
+        .collect::<Vec<_>>();
+
+    vulnerabilities.iter().any(|v| {
+        match v
+            .patched_versions
+            .as_ref()
+            .or(v.first_patched_version.as_ref())
+        {
+            Some(p) => number_regex.is_match(p),
+            None => false,
+        }
+    })
+}
+
+pub fn is_target_package(
+    target_packages: &Option<Vec<String>>,
+    vulnerability: &octocrab::models::security_advisories::Vulnerability,
+) -> bool {
+    let target_packages = target_packages.as_ref();
+
+    if let Some(target_packages) = target_packages {
+        let target_packages = target_packages
+            .iter()
+            .map(|p| p.to_lowercase())
+            .collect::<Vec<_>>();
+        let is_target_package = vulnerability
+            .package
+            .as_ref()
+            .and_then(|p| p.name.as_ref())
+            .map(|n| {
+                if n.contains(".*") {
+                    let asterisk_name = n.to_lowercase().replace(".*", ".");
+                    return target_packages
+                        .iter()
+                        .any(|p| p.starts_with(&asterisk_name));
+                }
+
+                target_packages.contains(&n.to_lowercase())
+            });
+
+        // It's not in target package
+        if is_target_package == Some(false) {
+            trace!(
+                "`{:?}` is not target package.",
+                vulnerability.package.as_ref().and_then(|p| p.name.as_ref())
+            );
+            return false;
+        }
+    }
+
+    true
+}
+
 pub fn is_target_version_for_vulnerabilities(
     advisory_id: impl Into<String>,
     target_version: impl Into<String>,
+    target_packages: &Option<Vec<String>>,
     vulnerabilities: &[octocrab::models::security_advisories::Vulnerability],
 ) -> bool {
     let advisory_id: String = advisory_id.into();
     let target_version: String = target_version.into();
 
     vulnerabilities.iter().any(|v| {
+        if !is_target_package(target_packages, v) {
+            return false;
+        }
+
         let vulnerable_version_range = match &v.vulnerable_version_range {
             Some(r) => r,
             None => return false,
@@ -239,7 +355,7 @@ pub fn is_target_version_for_vulnerabilities(
     })
 }
 
-fn map_advisory(advisory: &gh::SecurityAdvisory) -> Advisory {
+fn map_advisory(advisory: &PatchedSecurityAdvisory) -> Advisory {
     Advisory {
         ghsa_id: advisory.ghsa_id.clone(),
         cve_id: advisory.cve_id.clone(),

@@ -1,4 +1,5 @@
 use crate::advisory::Severity;
+use chrono::{DateTime, Utc};
 use clap::ValueEnum;
 use log::{debug, trace};
 use semver::Version;
@@ -48,6 +49,9 @@ pub struct Target {
     pub ecosystem: Option<String>,
     pub advisory_type: AdvisoryType,
     pub repository_path: Option<String>,
+    pub packages: Option<Vec<String>>,
+    pub ignore: Option<Vec<String>>,
+    pub ignore_before_published_at: Option<DateTime<Utc>>,
 }
 
 impl Target {
