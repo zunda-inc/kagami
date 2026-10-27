@@ -10,6 +10,7 @@ use octocrab::Octocrab;
 use octocrab::models::security_advisories as gh;
 use semver::{Prerelease, Version, VersionReq};
 use std::error::Error;
+use crate::ghsa_workaround::{PatchedSecurityAdvisoriesHandler, PatchedSecurityAdvisory};
 
 pub async fn find_vulnerabilities(
     targets: &Vec<Target>,
@@ -36,7 +37,7 @@ pub async fn find_vulnerabilities(
                     target.ecosystem.as_deref().unwrap_or("any")
                 );
 
-                let security_advisories_query = octocrab.security_advisories();
+                let security_advisories_query = PatchedSecurityAdvisoriesHandler::new(octocrab);
                 let mut query = security_advisories_query
                     .list()
                     .affects(target_name.clone());
@@ -110,7 +111,7 @@ pub async fn find_vulnerabilities(
 
 fn process_advisory_type_github(
     target: &Target,
-    results: &Vec<gh::SecurityAdvisory>,
+    results: &Vec<PatchedSecurityAdvisory>,
 ) -> Result<TargetWithAdvisory, Box<dyn Error>> {
     let mut mapped_advisories: Vec<Advisory> = vec![];
 
@@ -239,7 +240,7 @@ pub fn is_target_version_for_vulnerabilities(
     })
 }
 
-fn map_advisory(advisory: &gh::SecurityAdvisory) -> Advisory {
+fn map_advisory(advisory: &PatchedSecurityAdvisory) -> Advisory {
     Advisory {
         ghsa_id: advisory.ghsa_id.clone(),
         cve_id: advisory.cve_id.clone(),

@@ -9,6 +9,7 @@ pub mod advisory;
 pub mod error;
 pub mod fail_on_severity;
 pub mod ghsa;
+pub mod ghsa_workaround;
 pub mod github_client;
 pub mod logger;
 pub mod normalize_version;
