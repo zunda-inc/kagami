@@ -9,6 +9,7 @@ use itertools::Itertools;
 use log::{debug, info, trace, warn};
 use octocrab::Octocrab;
 use octocrab::models::security_advisories as gh;
+use regex::Regex;
 use semver::{Prerelease, Version, VersionReq};
 use std::error::Error;
 
@@ -263,14 +264,21 @@ pub fn has_any_patched_version(
     target_packages: &Option<Vec<String>>,
     vulnerabilities: &[octocrab::models::security_advisories::Vulnerability],
 ) -> bool {
+    let number_regex = Regex::new("[0-9]").expect("Regex parse failure");
     let vulnerabilities = vulnerabilities
         .iter()
         .filter(|v| is_target_package(target_packages, v))
         .collect::<Vec<_>>();
 
-    vulnerabilities.iter().any(|v| match &v.patched_versions {
-        Some(p) => p.matches("[0-9]").count() > 0,
-        None => false,
+    vulnerabilities.iter().any(|v| {
+        match v
+            .patched_versions
+            .as_ref()
+            .or(v.first_patched_version.as_ref())
+        {
+            Some(p) => number_regex.is_match(p),
+            None => false,
+        }
     })
 }
 
