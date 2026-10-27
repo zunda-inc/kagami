@@ -380,7 +380,8 @@ fn fix_version(version: &str) -> String {
 //   [`>= 2.1.0`, `< 2.2.7`, `>= 2.3.0`, `< 2.3.4`]  ->  `>= 2.1.0, < 2.2.7 || >= 2.3.0, < 2.3.4`
 //   [`< 3.5.3`, `>= 3.6.0`, `< 3.11.3`]             ->  `< 3.5.3 || >= 3.6.0, < 3.11.3`
 //   [`< 1.8.4`, `< 1.9.1`]                          ->  `< 1.8.4 || >= 1.9.0, < 1.9.1`
-//   [`<= 1.11.14`, `<= 1.12.7`, `= 1.13.0`]         ->  `<= 1.11.14 || >= 1.12.0, <= 1.12.7 || = 1.13.0`
+//   [`<= 2.10.2`, `= 2.9.7`, `= 2.8.11`]            ->  `>= 2.10.0, <= 2.10.2 || >= 2.9.0, <= 2.9.7 || <= 2.8.11`
+//   [`< 1.4.12`, `= 1.5.0`, `= 1.5.1`]              ->  `< 1.4.12 || = 1.5.0 || = 1.5.1`
 //   [`>= 5.0.0`, `= 6.0.0`]                         ->  `>= 5.0.0, <= 6.0.0`
 fn group_into_branches(comparators: Vec<String>) -> String {
     let mut branches: Vec<Vec<String>> = vec![];
@@ -396,13 +397,50 @@ fn group_into_branches(comparators: Vec<String>) -> String {
         previous_is_exact = is_exact;
     }
 
-    branches
+    join_versions_to_upper_bound_lists(branches)
         .iter()
         .map(|branch| {
             let requirement = branch.join(", ");
             upper_bounds_to_branches(&requirement).unwrap_or(requirement)
         })
         .join(" || ")
+}
+
+// An operator can be written once for a whole list: in `<= 2.10.2, 2.9.7, 2.8.11` each version is
+// the last affected one of its release branch. So the exact versions right after a branch of upper
+// bounds join it as `<=` bounds, if the result is a list of upper bounds with one per release
+// branch, as `upper_bounds_to_branches` reads it. Several versions of one branch
+// (`< 1.4.12, 1.5.0, 1.5.1`) are a list of exact versions instead and stay as they are.
+//   [[`<= 2.10.2`], [`= 2.9.7`], [`= 2.8.11`]]  ->  [[`<= 2.10.2`, `<= 2.9.7`, `<= 2.8.11`]]
+//   [[`< 1.4.12`], [`= 1.5.0`], [`= 1.5.1`]]    ->  [[`< 1.4.12`], [`= 1.5.0`], [`= 1.5.1`]]
+fn join_versions_to_upper_bound_lists(branches: Vec<Vec<String>>) -> Vec<Vec<String>> {
+    let is_upper_bounds = |branch: &Vec<String>| branch.iter().all(|c| c.starts_with('<'));
+    let is_exact_version = |branch: &&Vec<String>| branch.len() == 1 && branch[0].starts_with("= ");
+
+    let mut joined: Vec<Vec<String>> = vec![];
+    let mut index = 0;
+    while index < branches.len() {
+        let branch = &branches[index];
+        let versions = branches[index + 1..]
+            .iter()
+            .take_while(is_exact_version)
+            .map(|version| version[0].replacen("= ", "<= ", 1))
+            .collect::<Vec<_>>();
+        let list = [branch.clone(), versions.clone()].concat();
+
+        let is_list = is_upper_bounds(branch)
+            && !versions.is_empty()
+            && upper_bounds_to_branches(&list.join(", ")).is_some();
+        if is_list {
+            joined.push(list);
+            index += 1 + versions.len();
+        } else {
+            joined.push(branch.clone());
+            index += 1;
+        }
+    }
+
+    joined
 }
 
 // Hand-written ranges sometimes leave out the operator at one end of a branch, so an exact version
