@@ -144,7 +144,7 @@ fn process_advisory_type_github(
         };
 
         if Some(advisory.published_at) < target.ignore_before_published_at
-            && has_any_patched_version(&vulnerabilities)
+            && has_any_patched_version(&target.packages, &vulnerabilities)
         {
             trace!("`{:?}` is before the ignore date.", advisory.published_at);
             continue;
@@ -219,7 +219,7 @@ fn process_advisory_type_github_repository(
         };
 
         if Some(advisory.published_at) < Some(target.ignore_before_published_at)
-            && has_any_patched_version(&vulnerabilities)
+            && has_any_patched_version(&target.packages, &vulnerabilities)
         {
             trace!("`{:?}` is before the ignore date.", advisory.published_at);
             continue;
@@ -260,12 +260,59 @@ fn process_advisory_type_github_repository(
 }
 
 pub fn has_any_patched_version(
+    target_packages: &Option<Vec<String>>,
     vulnerabilities: &[octocrab::models::security_advisories::Vulnerability],
 ) -> bool {
+    let vulnerabilities = vulnerabilities
+        .iter()
+        .filter(|v| is_target_package(target_packages, v))
+        .collect::<Vec<_>>();
+
     vulnerabilities.iter().any(|v| match &v.patched_versions {
-        Some(p) => p.len() > 4,
+        Some(p) => p.matches("[0-9]").count() > 0,
         None => false,
     })
+}
+
+pub fn is_target_package(
+    target_packages: &Option<Vec<String>>,
+    vulnerability: &octocrab::models::security_advisories::Vulnerability,
+) -> bool {
+    let target_packages = target_packages.as_ref();
+
+    if let Some(target_packages) = target_packages {
+        let target_packages = target_packages
+            .iter()
+            .map(|p| p.to_lowercase())
+            .collect::<Vec<_>>();
+        let is_target_package = vulnerability
+            .package
+            .as_ref()
+            .and_then(|p| p.name.as_ref())
+            .and_then(|n| {
+                if n.contains(".*") {
+                    let asterisk_name = n.to_lowercase().replace(".*", ".");
+                    return Some(
+                        target_packages
+                            .iter()
+                            .any(|p| p.starts_with(&asterisk_name)),
+                    );
+                }
+
+                Some(target_packages.contains(&n.to_lowercase()))
+            });
+
+        // It's not in target package
+        if is_target_package == Some(false) {
+            trace!(
+                "`{:?}` is not target package.",
+                vulnerability.package.as_ref().and_then(|p| p.name.as_ref())
+            );
+            return false;
+        }
+    }
+
+    true
 }
 
 pub fn is_target_version_for_vulnerabilities(
@@ -274,38 +321,12 @@ pub fn is_target_version_for_vulnerabilities(
     target_packages: &Option<Vec<String>>,
     vulnerabilities: &[octocrab::models::security_advisories::Vulnerability],
 ) -> bool {
-    let target_packages = target_packages.as_ref();
     let advisory_id: String = advisory_id.into();
     let target_version: String = target_version.into();
 
     vulnerabilities.iter().any(|v| {
-        if let Some(target_packages) = target_packages {
-            let target_packages = target_packages
-                .iter()
-                .map(|p| p.to_lowercase())
-                .collect::<Vec<_>>();
-            let is_target_package = v.package
-                .as_ref()
-                .and_then(|p| p.name.as_ref())
-                .and_then(|n| {
-                    if n.contains(".*") {
-                        let asterisk_name = n.to_lowercase().replace(".*", ".");
-                        return Some(target_packages.iter().any(|p| p.starts_with(&asterisk_name)))
-                    }
-
-                    Some(target_packages.contains(&n.to_lowercase()))
-                });
-
-            // It's not in target package
-            if is_target_package == Some(false) {
-                trace!(
-                    "`{:?}` is not target package.",
-                    v.package
-                    .as_ref()
-                    .and_then(|p| p.name.as_ref())
-                );
-                return false;
-            }
+        if !is_target_package(target_packages, v) {
+            return false;
         }
 
         let vulnerable_version_range = match &v.vulnerable_version_range {
