@@ -266,7 +266,7 @@ pub fn is_target_version_for_vulnerabilities(
                 .and_then(|p| p.name.as_ref())
                 .and_then(|n| {
                     if n.contains(".*") {
-                        let asterisk_name = n.to_lowercase().replace(".*", "");
+                        let asterisk_name = n.to_lowercase().replace(".*", ".");
                         return Some(target_packages.iter().any(|p| p.starts_with(&asterisk_name)))
                     }
 
