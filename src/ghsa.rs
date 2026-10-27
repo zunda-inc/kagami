@@ -132,7 +132,7 @@ fn process_advisory_type_github(
             continue;
         }
 
-        if Some(advisory.published_at) < target.ignore_before_published_date {
+        if Some(advisory.published_at) < target.ignore_before_published_at {
             trace!("`{:?}` is before the ignore date.", advisory.published_at);
             continue;
         }
@@ -205,7 +205,7 @@ fn process_advisory_type_github_repository(
             continue;
         }
 
-        if Some(advisory.published_at) < Some(target.ignore_before_published_date) {
+        if Some(advisory.published_at) < Some(target.ignore_before_published_at) {
             trace!("`{:?}` is before the ignore date.", advisory.published_at);
             continue;
         }

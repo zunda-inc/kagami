@@ -51,7 +51,7 @@ pub struct Target {
     pub repository_path: Option<String>,
     pub packages: Option<Vec<String>>,
     pub ignore: Option<Vec<String>>,
-    pub ignore_before_published_date: Option<DateTime<Utc>>,
+    pub ignore_before_published_at: Option<DateTime<Utc>>,
 }
 
 impl Target {
