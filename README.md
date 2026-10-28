@@ -21,6 +21,10 @@ Install kagami from [crates.io](https://crates.io/crates/kagami-cli) with
 cargo install --locked kagami-cli
 ```
 
+Prebuilt binaries are also available on [GitHub Releases](https://github.com/zunda-inc/kagami/releases).
+New releases include Windows executables for x86-64 and ARM64; for Windows on ARM64, download
+`kagami-<version>-aarch64-pc-windows-msvc.exe`.
+
 > [!TIP]
 > The crate is named `kagami-cli` because the name `kagami` is taken on crates.io by an unrelated
 > project. The installed command is `kagami`.

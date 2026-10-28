@@ -25,6 +25,35 @@ jobs:
           tool: cargo-nextest
       - run: cargo nextest run
 
+  windows-arm64:
+    runs-on: windows-11-arm
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          rustup toolchain install
+          rustup target add aarch64-pc-windows-msvc
+      - run: cargo build --release --locked --target aarch64-pc-windows-msvc
+      - name: Verify executable
+        shell: pwsh
+        run: |
+          $path = (Resolve-Path "target/aarch64-pc-windows-msvc/release/kagami.exe").Path
+          $bytes = [System.IO.File]::ReadAllBytes($path)
+          $peOffset = [BitConverter]::ToInt32($bytes, 0x3c)
+          if ([BitConverter]::ToUInt16($bytes, 0) -ne 0x5a4d -or
+              [BitConverter]::ToUInt32($bytes, $peOffset) -ne 0x4550 -or
+              [BitConverter]::ToUInt16($bytes, $peOffset + 4) -ne 0xaa64) {
+            throw "Expected a Windows ARM64 executable"
+          }
+          & $path --version
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
   clippy:
     runs-on: ubuntu-latest
     steps:
