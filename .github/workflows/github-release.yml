@@ -75,6 +75,7 @@ jobs:
           if-no-files-found: error
 
   release:
+    if: ${{ github.ref == 'refs/heads/main' }}
     needs: [version, build]
     runs-on: ubuntu-latest
     # The environment only accepts runs from main.
