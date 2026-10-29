@@ -25,8 +25,7 @@ async fn main() -> ExitCode {
     );
     trace!("Command line options: {:?}.", command);
 
-    // clap no longer prints the version by itself, so it is printed here before the config file is
-    // read.
+    // version command
     if command.version {
         if let Err(e) = output_version(command.fancy) {
             error!("Failed to write the version.");

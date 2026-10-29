@@ -4,7 +4,6 @@ use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[command(name = "kagami")]
-// `--version` is defined below instead of by clap, so that `--fancy` can be read together with it.
 #[command(version, disable_version_flag = true)]
 #[command(
     about = "This simple tool checks whether there are any publicly disclosed vulnerabilities in a list of defined software.",
