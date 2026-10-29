@@ -36,7 +36,7 @@ pub fn generate_terminal_lines(lines: &[TerminalStyledLine], h_gap: Option<usize
         formatted_lines.push(label_line);
 
         for x in content_lines[1..].iter() {
-            let content_line = format!("{}{}", " ".repeat(insert_string_length), x);
+            let content_line = format!("{}{}", " ".repeat(max_label_length), x);
             formatted_lines.push(content_line)
         }
     }
