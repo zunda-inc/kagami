@@ -4,7 +4,8 @@ use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[command(name = "kagami")]
-#[command(version)]
+// `--version` is defined below instead of by clap, so that `--fancy` can be read together with it.
+#[command(version, disable_version_flag = true)]
 #[command(
     about = "This simple tool checks whether there are any publicly disclosed vulnerabilities in a list of defined software.",
     long_about= None
@@ -23,4 +24,10 @@ pub struct KagamiCommands {
     /// Sets a path to the config file, relative to the current directory.
     #[arg(default_value = "kagami.yaml")]
     pub config_file_path: String,
+    /// Print version
+    #[arg(short = 'V', long)]
+    pub version: bool,
+    /// Prints the version with a logo, used with --version
+    #[arg(long, requires = "version")]
+    pub fancy: bool,
 }

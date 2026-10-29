@@ -1,9 +1,11 @@
-use crate::OutputFormat;
 use crate::advisory::{Advisory, CvssScore, Epss, Severity, TargetWithAdvisory, Vulnerability};
 use crate::error::KagamiError;
+use crate::{KagamiCommands, OutputFormat};
 use chrono::{DateTime, Utc};
-use console::{Color, Term, style};
+use clap::CommandFactory;
+use console::{Color, Term, measure_text_width, style};
 use log::trace;
+use std::env;
 use std::error::Error;
 
 pub fn output_to_stdout(
@@ -385,4 +387,127 @@ fn get_count_by_severity_for_advisories(results: &[Advisory], severity: Severity
         .filter(|v| v.severity == severity)
         .collect::<Vec<_>>()
         .len()
+}
+
+pub fn output_version(fancy: bool) -> Result<(), Box<dyn Error>> {
+    if !fancy {
+        print!("{}", KagamiCommands::command().render_version());
+        return Ok(());
+    }
+
+    output_fancy_version()
+}
+
+fn output_fancy_version() -> Result<(), Box<dyn Error>> {
+    let stdout_terminal = Term::stdout();
+
+    // 鏡 (kagami) means a mirror in Japanese
+    let logo = [
+        "    .####.         ###",
+        "   .###'###. ################",
+        "  .##'   '###   ##.    .##'",
+        ".###'     '#'   '##    ##'",
+        "'########## ##################",
+        "  '''###'''   ..............",
+        " ....###....  ##''''''''''##",
+        " ###########  ##..........##",
+        "     ###  .   ##''''''''''##",
+        " '## ###  ##  ##..........##",
+        "  ## ### ##'  '''##'''###'''",
+        "  ## ### ''     ###   ###",
+        "     ###...##  .##'   ###  '..",
+        "'#########''#.###'    ###  .##",
+        " ''''      ###''      '######'",
+    ];
+    let logo_width = 33usize;
+
+    let details = [
+        format!(
+            "{}{}",
+            styled_detail_label("Package"),
+            style(env!("CARGO_PKG_NAME")).bold()
+        ),
+        format!(
+            "{}{}",
+            styled_detail_label("License"),
+            style(env!("CARGO_PKG_LICENSE")).bold()
+        ),
+        format!(
+            "{}{}",
+            styled_detail_label("Repository"),
+            style(env!("CARGO_PKG_REPOSITORY")).bold()
+        ),
+        format!(
+            "{}{}",
+            styled_detail_label("Platform"),
+            style(format!("{} {}", env::consts::OS, env::consts::ARCH)).bold()
+        ),
+        format!(
+            "{}{}",
+            styled_detail_label("MSRV"),
+            style(env!("CARGO_PKG_RUST_VERSION")).bold()
+        ),
+    ];
+    let divider_width = details
+        .iter()
+        .map(|line| measure_text_width(line))
+        .max()
+        .unwrap_or(0);
+
+    let mut info = vec![
+        format!(
+            "{} {}",
+            style("kagami").cyan().bold(),
+            style(env!("CARGO_PKG_VERSION")).bold()
+        ),
+        style("━".repeat(divider_width)).cyan().to_string(),
+    ];
+    info.extend(details);
+
+    // The info is centered vertically next to the logo
+    let info_top = logo.len().saturating_sub(info.len()) / 2;
+
+    for row in 0..logo.len().max(info_top + info.len()) {
+        let logo_line = logo.get(row).unwrap_or(&"");
+        let info_line = row
+            .checked_sub(info_top)
+            .and_then(|index| info.get(index))
+            .map(|line| line.as_str())
+            .unwrap_or("");
+        stdout_terminal.write_line(
+            format!(
+                "{}{}",
+                styled_logo_line(format!("{logo_line:<logo_width$}").as_str(), row),
+                info_line
+            )
+            .as_str(),
+        )?;
+    }
+
+    Ok(())
+}
+
+fn styled_logo_line(line: &str, row: usize) -> String {
+    // Orange, light green, sky blue, blue, light pink and deep pink run diagonally across the logo.
+    // A row counts twice, as a character is about twice as tall as it is wide.
+    let gradient = [
+        (0xff, 0x92, 0x33),
+        (0x97, 0xf2, 0x79),
+        (0x57, 0xdd, 0xff),
+        (0x47, 0x78, 0xff),
+        (0xff, 0xa3, 0xd4),
+        (0xfa, 0x2d, 0x86),
+    ];
+    // 33 columns and 15 rows of the logo make 61 steps along the diagonal
+    let diagonal_length = 61usize;
+
+    line.chars()
+        .enumerate()
+        .map(|(column, c)| {
+            let index =
+                ((column + row * 2) * gradient.len() / diagonal_length).min(gradient.len() - 1);
+            let (red, green, blue) = gradient[index];
+            style(c).true_color(red, green, blue).to_string()
+        })
+        .collect()
 }

@@ -5,7 +5,7 @@ use kagami::fail_on_severity::should_fail_on_severity;
 use kagami::ghsa::find_vulnerabilities;
 use kagami::github_client::init_octocrab;
 use kagami::logger::{initialize_default_logger, initialize_logger_by_loglevel};
-use kagami::output::output_to_stdout;
+use kagami::output::{output_to_stdout, output_version};
 use kagami::{Config, KagamiCommands};
 use log::{debug, error, info, trace};
 use std::process::ExitCode;
@@ -24,6 +24,17 @@ async fn main() -> ExitCode {
             .unwrap_or(Config::default().log_level.unwrap()),
     );
     trace!("Command line options: {:?}.", command);
+
+    // clap no longer prints the version by itself, so it is printed here before the config file is
+    // read.
+    if command.version {
+        if let Err(e) = output_version(command.fancy) {
+            error!("Failed to write the version.");
+            error!("{}", e);
+            return ExitCode::FAILURE;
+        }
+        return ExitCode::SUCCESS;
+    }
 
     let parsed_config_file = match parse_config_file(&command.config_file_path) {
         Ok(f) => f,
