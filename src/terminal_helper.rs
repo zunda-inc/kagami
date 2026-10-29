@@ -44,7 +44,6 @@ pub fn generate_terminal_lines(lines: &[TerminalStyledLine], h_gap: Option<usize
     formatted_lines
 }
 
-// 他で代用出来れば使わなくても良い
 pub fn print_string_vec(
     terminal: &Term,
     lines: Vec<String>,
