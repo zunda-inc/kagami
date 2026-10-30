@@ -1,12 +1,10 @@
 use crate::advisory::{Advisory, CvssScore, Epss, Severity, TargetWithAdvisory, Vulnerability};
 use crate::error::KagamiError;
 use crate::terminal_helper::{TerminalStyledLine, generate_terminal_lines, print_string_vec};
-use crate::{KagamiCommands, OutputFormat, terminal_helper};
+use crate::{OutputFormat, terminal_helper};
 use chrono::{DateTime, Utc};
-use clap::CommandFactory;
-use console::{Color, Term, measure_text_width, style};
+use console::{Color, Term, style};
 use log::trace;
-use std::env;
 use std::error::Error;
 
 pub fn output_to_stdout(
