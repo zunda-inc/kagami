@@ -114,11 +114,13 @@ pub fn output_version(is_fancy_output: bool) -> Result<(), Box<dyn std::error::E
         stdout_terminal.write_line(&KagamiCommands::command().render_version())?;
     }
 
+    output_fancy_version(&stdout_terminal)?;
+
     Ok(())
 }
 
 pub fn output_fancy_version(term: &Term) -> Result<(), Box<dyn std::error::Error>> {
-    let mut details_strs: Vec<String> = vec![];
+    let mut details_strs: VecDeque<String> = VecDeque::new();
     let details = generate_terminal_lines(
         &[
             TerminalStyledLine {
@@ -146,15 +148,25 @@ pub fn output_fancy_version(term: &Term) -> Result<(), Box<dyn std::error::Error
         ],
         None,
     );
-    details_strs.push(format!(
+    details_strs.push_back(format!(
         "{}@{}",
         style("kagami").cyan(),
         style(env!("CARGO_PKG_VERSION")).magenta()
     ));
-    details_strs.push(style("━".repeat(100)).cyan().to_string());
-    details_strs.extend(details);
+    details_strs.push_back(style("━".repeat(100)).cyan().to_string());
+    details_strs.extend(details.clone());
 
-    let gradient_logo = create_gradient_logo(LOGO, &GRADIENT_COLOR);
+    let gradient_logo = create_gradient_logo(LOGO, &GRADIENT_COLOR)?;
+    let details_start_line = (gradient_logo.len() - details.len()) / 2;
+
+    for (idx, logo_line) in gradient_logo.iter().enumerate() {
+        if idx >= details_start_line && !details_strs.is_empty() {
+            term.write_line(&format!("{}    {:?}", logo_line, details_strs.pop_front()))?;
+            continue;
+        }
+
+        term.write_line(logo_line)?;
+    }
 
     Ok(())
 }
