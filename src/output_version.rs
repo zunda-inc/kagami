@@ -155,7 +155,7 @@ pub fn output_fancy_version(term: &Term) -> Result<(), Box<dyn std::error::Error
         style("kagami").cyan(),
         style(env!("CARGO_PKG_VERSION")).magenta()
     ));
-    details_strs.push_back(style("━".repeat(100)).cyan().to_string());
+    details_strs.push_back(style("━".repeat(50)).cyan().to_string());
     details_strs.extend(details.clone());
 
     let gradient_logo = create_gradient_logo(LOGO, &GRADIENT_COLOR)?;
