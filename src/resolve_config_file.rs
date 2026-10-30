@@ -1,6 +1,7 @@
 use crate::error::KagamiError;
 use log::error;
 use std::error::Error;
+use std::path::Path;
 
 pub fn resole_config_file_path(
     config_file_path: Option<impl Into<String>>,
@@ -8,9 +9,9 @@ pub fn resole_config_file_path(
     let config_path = match config_file_path {
         Some(s) => Ok(s.into()),
         None => {
-            if std::path::Path::new("kagami.yaml").exists() {
+            if Path::new("kagami.yaml").exists() {
                 Ok("kagami.yaml".to_string())
-            } else if std::path::Path::new("kagami.yml").exists() {
+            } else if Path::new("kagami.yml").exists() {
                 Ok("kagami.yml".to_string())
             } else {
                 error!(
