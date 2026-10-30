@@ -4,7 +4,6 @@ use clap::CommandFactory;
 use console::{Term, measure_text_width, style};
 use std::collections::VecDeque;
 use std::env;
-use std::io::Write;
 
 static LOGO: [&str; 15] = [
     "    ▄████▄         ███",
