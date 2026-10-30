@@ -20,9 +20,9 @@ pub struct KagamiCommands {
     /// If no severity is specified, it will always exit with a code of 0 unless an error occurs.
     #[arg(short, long, value_enum)]
     pub fail_on_severity: Option<Severity>,
-    /// Sets a path to the config file, relative to the current directory.
-    #[arg(default_value = "kagami.yaml")]
-    pub config_file_path: String,
+    /// Sets a path to the config file [default: kagami.yaml or kagami.yml]
+    #[arg()]
+    pub config_file_path: Option<String>,
     /// Print version
     #[arg(short = 'V', long)]
     pub version: bool,

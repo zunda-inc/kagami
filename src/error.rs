@@ -4,6 +4,7 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug)]
 pub enum KagamiError {
     OptionalGuard(String),
+    FailedToResolveConfigFilePath(),
 }
 
 impl Display for KagamiError {
@@ -11,6 +12,9 @@ impl Display for KagamiError {
         match self {
             KagamiError::OptionalGuard(s) => {
                 write!(f, "`{}` must not be None value.", s)
+            }
+            KagamiError::FailedToResolveConfigFilePath() => {
+                write!(f, "Failed to resolve config file path.")
             }
         }
     }

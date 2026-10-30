@@ -13,7 +13,7 @@ fn flags_are_none_when_not_given() {
     assert_eq!(command.output_format, None);
     assert_eq!(command.log_level, None);
     assert_eq!(command.fail_on_severity, None);
-    assert_eq!(command.config_file_path, "kagami.yaml");
+    assert_eq!(command.config_file_path, None);
 }
 
 #[test]

@@ -7,6 +7,7 @@ use kagami::github_client::init_octocrab;
 use kagami::logger::{initialize_default_logger, initialize_logger_by_loglevel};
 use kagami::output::output_to_stdout;
 use kagami::output_version::output_version;
+use kagami::resolve_config_file::resolve_config_file_path;
 use kagami::{Config, KagamiCommands};
 use log::{debug, error, info, trace};
 use std::process::ExitCode;
@@ -36,13 +37,18 @@ async fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    let parsed_config_file = match parse_config_file(&command.config_file_path) {
+    let config_file_path = match resolve_config_file_path(command.config_file_path.clone()) {
+        Ok(c) => c,
+        Err(e) => {
+            error!("{}", e);
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let parsed_config_file = match parse_config_file(&config_file_path) {
         Ok(f) => f,
         Err(e) => {
-            error!(
-                "Failed to load config file from `{}`.",
-                command.config_file_path
-            );
+            error!("Failed to load config file from `{}`.", config_file_path);
             error!("{}", e);
             return ExitCode::FAILURE;
         }
@@ -59,7 +65,7 @@ async fn main() -> ExitCode {
 
     info!(
         "Config file successfully loaded from `{}`.",
-        command.config_file_path
+        config_file_path
     );
 
     debug!("Validating config...");
