@@ -160,7 +160,11 @@ pub fn output_fancy_version(term: &Term) -> Result<(), Box<dyn std::error::Error
 
     for (idx, logo_line) in gradient_logo.iter().enumerate() {
         if idx >= details_start_line && !details_strs.is_empty() {
-            term.write_line(&format!("{}    {:?}", logo_line, details_strs.pop_front()))?;
+            term.write_line(&format!(
+                "{}    {}",
+                logo_line,
+                details_strs.pop_front().unwrap_or("".to_string())
+            ))?;
             continue;
         }
 
