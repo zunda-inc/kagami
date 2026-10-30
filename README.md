@@ -71,7 +71,7 @@ The [`kagami.yaml`](kagami.yaml) of this repository is a larger example.
 kagami [OPTIONS] [CONFIG_FILE_PATH]
 ```
 
-- `CONFIG_FILE_PATH`: the config file to read (default: `kagami.yaml`)
+- `CONFIG_FILE_PATH`: the config file to read (default: `kagami.yaml`, then `kagami.yml`)
 - `-o`, `--output-format`: `text` (default), `json`, `yaml` or `simple-markdown-text`
 - `-l`, `--log-level`: `error`, `warn` (default), `info`, `debug` or `trace`
 - `-f`, `--fail-on-severity`: `unknown`, `low`, `medium`, `high` or `critical`, the lowest severity
