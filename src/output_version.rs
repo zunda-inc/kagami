@@ -1,7 +1,7 @@
 use crate::KagamiCommands;
 use crate::terminal_helper::{TerminalStyledLine, generate_terminal_lines};
 use clap::CommandFactory;
-use console::{Term, style};
+use console::{Term, measure_text_width, style};
 use std::collections::VecDeque;
 use std::env;
 
@@ -67,9 +67,12 @@ pub fn create_gradient_logo(
     logo: impl IntoIterator<Item = impl Into<String>>,
     gradient_colors: &[Rgb],
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    // 最大30文字の行が15列あるとき、行ごとに1文字ずつ左にずらしていくので、合わせる色のテープは 30文字 + (15行 x ずらす1文字) = 45文字あれば良い
-    // これをそれぞれの色の数、すなわち6色で割ると、1色あたり7.5文字になる
-    // 45文字を7.5文字ごとに色を変えていった色のテープを作り、1文字ずつ左にずらしていくと、いい感じになる。
+    // With 15 rows of up to 30 characters, shifting each row one character to the left
+    // means the color tape needs 30 characters + (15 rows x 1 character shift) = 45 characters.
+    // Dividing this by the number of colors, 6, gives 7.5 characters per color.
+    // Create a color tape that changes color every 7.5 characters across 45 characters,
+    // then shift it one character to the left for each row to get a nice effect.
+
     let logo: Vec<String> = logo.into_iter().map(|v| v.into()).collect();
 
     let shift_size_per_line = 1u32;
@@ -156,13 +159,25 @@ pub fn output_fancy_version(term: &Term) -> Result<(), Box<dyn std::error::Error
     details_strs.extend(details.clone());
 
     let gradient_logo = create_gradient_logo(LOGO, &GRADIENT_COLOR)?;
+
+    // NOTE: text width must be measured with `measure_text_width` because the logo lines
+    // contain ANSI escape sequences for color, which do not contribute to the visible width of the text.
+    let logo_lines_max_width = gradient_logo
+        .iter()
+        .map(|l| measure_text_width(l))
+        .max()
+        .unwrap_or(0);
+
     let details_start_line = (gradient_logo.len() - details.len()) / 2;
 
     for (idx, logo_line) in gradient_logo.iter().enumerate() {
         if idx >= details_start_line - 1 && !details_strs.is_empty() {
+            let insert_white_space_width = logo_lines_max_width - measure_text_width(logo_line);
+            let padding = 4;
             term.write_line(&format!(
-                "{}    {}",
+                "{}{}{}",
                 logo_line,
+                " ".repeat(insert_white_space_width + padding),
                 details_strs.pop_front().unwrap_or("".to_string())
             ))?;
             continue;
