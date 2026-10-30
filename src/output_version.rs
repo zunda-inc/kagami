@@ -76,8 +76,8 @@ pub fn create_gradient_logo(
     let max_logo_line_length = u32::try_from(logo.iter().map(|l| l.len()).max().unwrap_or(0))?;
     let color_tape_length =
         max_logo_line_length + (u32::try_from(logo.len())? * shift_size_per_line);
-    let length_by_color = (f64::try_from(color_tape_length)?
-        / f64::try_from(u32::try_from(gradient_colors.len())?)?)
+    let length_by_color = (f64::from(color_tape_length)
+        / f64::from(u32::try_from(gradient_colors.len())?))
     .ceil()
     .to_bits();
 
