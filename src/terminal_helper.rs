@@ -1,4 +1,4 @@
-use console::{Term, measure_text_width};
+use console::{Term, measure_text_width, style};
 
 #[derive(Clone)]
 pub struct TerminalStyledLine {
@@ -53,4 +53,8 @@ pub fn print_string_vec(
     }
 
     Ok(())
+}
+
+pub fn styled_detail_label(label: &str) -> String {
+    style(label).dim().to_string()
 }

@@ -1,7 +1,7 @@
 use crate::advisory::{Advisory, CvssScore, Epss, Severity, TargetWithAdvisory, Vulnerability};
 use crate::error::KagamiError;
 use crate::terminal_helper::{TerminalStyledLine, generate_terminal_lines, print_string_vec};
-use crate::{KagamiCommands, OutputFormat};
+use crate::{KagamiCommands, OutputFormat, terminal_helper};
 use chrono::{DateTime, Utc};
 use clap::CommandFactory;
 use console::{Color, Term, measure_text_width, style};
@@ -217,27 +217,27 @@ fn print_advisory_details(terminal: &Term, advisory: &Advisory) -> Result<(), Bo
 
     let mut lines = vec![
         TerminalStyledLine {
-            label: styled_detail_label("ID"),
+            label: terminal_helper::styled_detail_label("ID"),
             content: style(ids).bold().to_string(),
         },
         TerminalStyledLine {
-            label: styled_detail_label("URL"),
+            label: terminal_helper::styled_detail_label("URL"),
             content: style(&advisory.html_url).underlined().to_string(),
         },
         TerminalStyledLine {
-            label: styled_detail_label("CVSS v3"),
+            label: terminal_helper::styled_detail_label("CVSS v3"),
             content: styled_cvss_score(&advisory.cvss_severities.cvss_v3),
         },
         TerminalStyledLine {
-            label: styled_detail_label("CVSS v4"),
+            label: terminal_helper::styled_detail_label("CVSS v4"),
             content: styled_cvss_score(&advisory.cvss_severities.cvss_v4),
         },
         TerminalStyledLine {
-            label: styled_detail_label("EPSS"),
+            label: terminal_helper::styled_detail_label("EPSS"),
             content: styled_epss(advisory.epss),
         },
         TerminalStyledLine {
-            label: styled_detail_label("Published"),
+            label: terminal_helper::styled_detail_label("Published"),
             content: format!(
                 "{} (updated {})",
                 formatted_date(&advisory.published_at),
@@ -247,7 +247,7 @@ fn print_advisory_details(terminal: &Term, advisory: &Advisory) -> Result<(), Bo
     ];
     if let Some(withdrawn_at) = &advisory.withdrawn_at {
         lines.push(TerminalStyledLine {
-            label: styled_detail_label("Withdrawn"),
+            label: terminal_helper::styled_detail_label("Withdrawn"),
             content: style(formatted_date(withdrawn_at))
                 .yellow()
                 .bold()
@@ -257,7 +257,7 @@ fn print_advisory_details(terminal: &Term, advisory: &Advisory) -> Result<(), Bo
     if !advisory.vulnerabilities.is_empty() {
         // Only the first affected package carries the label, the others line up under it.
         lines.push(TerminalStyledLine {
-            label: styled_detail_label("Affected"),
+            label: terminal_helper::styled_detail_label("Affected"),
             content: advisory
                 .vulnerabilities
                 .iter()
@@ -271,10 +271,6 @@ fn print_advisory_details(terminal: &Term, advisory: &Advisory) -> Result<(), Bo
     terminal.write_line("")?;
 
     Ok(())
-}
-
-pub fn styled_detail_label(label: &str) -> String {
-    style(label).dim().to_string()
 }
 
 fn styled_cvss_score(cvss: &CvssScore) -> String {
@@ -413,25 +409,25 @@ fn output_fancy_version() -> Result<(), Box<dyn Error>> {
     let details = generate_terminal_lines(
         &[
             TerminalStyledLine {
-                label: styled_detail_label("Package"),
+                label: terminal_helper::styled_detail_label("Package"),
                 content: style(env!("CARGO_PKG_NAME")).bold().to_string(),
             },
             TerminalStyledLine {
-                label: styled_detail_label("License"),
+                label: terminal_helper::styled_detail_label("License"),
                 content: style(env!("CARGO_PKG_LICENSE")).bold().to_string(),
             },
             TerminalStyledLine {
-                label: styled_detail_label("Repository"),
+                label: terminal_helper::styled_detail_label("Repository"),
                 content: style(env!("CARGO_PKG_REPOSITORY")).bold().to_string(),
             },
             TerminalStyledLine {
-                label: styled_detail_label("Platform"),
+                label: terminal_helper::styled_detail_label("Platform"),
                 content: style(format!("{} {}", env::consts::OS, env::consts::ARCH))
                     .bold()
                     .to_string(),
             },
             TerminalStyledLine {
-                label: styled_detail_label("MSRV"),
+                label: terminal_helper::styled_detail_label("MSRV"),
                 content: style(env!("CARGO_PKG_RUST_VERSION")).bold().to_string(),
             },
         ],

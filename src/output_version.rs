@@ -83,25 +83,25 @@ pub fn output_fancy_version(term: &Term) -> Result<(), Box<dyn std::error::Error
     let details = generate_terminal_lines(
         &[
             TerminalStyledLine {
-                label: crate::output::styled_detail_label("Package"),
+                label: crate::terminal_helper::styled_detail_label("Package"),
                 content: style(env!("CARGO_PKG_NAME")).bold().to_string(),
             },
             TerminalStyledLine {
-                label: crate::output::styled_detail_label("License"),
+                label: crate::terminal_helper::styled_detail_label("License"),
                 content: style(env!("CARGO_PKG_LICENSE")).bold().to_string(),
             },
             TerminalStyledLine {
-                label: crate::output::styled_detail_label("Repository"),
+                label: crate::terminal_helper::styled_detail_label("Repository"),
                 content: style(env!("CARGO_PKG_REPOSITORY")).bold().to_string(),
             },
             TerminalStyledLine {
-                label: crate::output::styled_detail_label("Platform"),
+                label: crate::terminal_helper::styled_detail_label("Platform"),
                 content: style(format!("{} {}", env::consts::OS, env::consts::ARCH))
                     .bold()
                     .to_string(),
             },
             TerminalStyledLine {
-                label: crate::output::styled_detail_label("MSRV"),
+                label: crate::terminal_helper::styled_detail_label("MSRV"),
                 content: style(env!("CARGO_PKG_RUST_VERSION")).bold().to_string(),
             },
         ],
