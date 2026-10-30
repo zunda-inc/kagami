@@ -15,3 +15,5 @@ pub mod logger;
 pub mod normalize_version;
 pub mod normalize_version_words;
 pub mod output;
+pub mod output_version;
+pub mod terminal_helper;

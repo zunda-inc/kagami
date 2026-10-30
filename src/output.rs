@@ -1,6 +1,7 @@
-use crate::OutputFormat;
 use crate::advisory::{Advisory, CvssScore, Epss, Severity, TargetWithAdvisory, Vulnerability};
 use crate::error::KagamiError;
+use crate::terminal_helper::{TerminalStyledLine, generate_terminal_lines, print_string_vec};
+use crate::{OutputFormat, terminal_helper};
 use chrono::{DateTime, Utc};
 use console::{Color, Term, style};
 use log::trace;
@@ -212,78 +213,62 @@ fn print_advisory_details(terminal: &Term, advisory: &Advisory) -> Result<(), Bo
         None => advisory.ghsa_id.clone(),
     };
 
-    terminal.write_line(format!("{}{}", styled_detail_label("ID"), style(ids).bold()).as_str())?;
-    terminal.write_line(
-        format!(
-            "{}{}",
-            styled_detail_label("URL"),
-            style(&advisory.html_url).underlined()
-        )
-        .as_str(),
-    )?;
-    terminal.write_line(
-        format!(
-            "{}{}",
-            styled_detail_label("CVSS v3"),
-            styled_cvss_score(&advisory.cvss_severities.cvss_v3)
-        )
-        .as_str(),
-    )?;
-    terminal.write_line(
-        format!(
-            "{}{}",
-            styled_detail_label("CVSS v4"),
-            styled_cvss_score(&advisory.cvss_severities.cvss_v4)
-        )
-        .as_str(),
-    )?;
-    terminal.write_line(
-        format!(
-            "{}{}",
-            styled_detail_label("EPSS"),
-            styled_epss(advisory.epss)
-        )
-        .as_str(),
-    )?;
-    terminal.write_line(
-        format!(
-            "{}{} (updated {})",
-            styled_detail_label("Published"),
-            formatted_date(&advisory.published_at),
-            formatted_date(&advisory.updated_at)
-        )
-        .as_str(),
-    )?;
+    let mut lines = vec![
+        TerminalStyledLine {
+            label: terminal_helper::styled_detail_label("ID"),
+            content: style(ids).bold().to_string(),
+        },
+        TerminalStyledLine {
+            label: terminal_helper::styled_detail_label("URL"),
+            content: style(&advisory.html_url).underlined().to_string(),
+        },
+        TerminalStyledLine {
+            label: terminal_helper::styled_detail_label("CVSS v3"),
+            content: styled_cvss_score(&advisory.cvss_severities.cvss_v3),
+        },
+        TerminalStyledLine {
+            label: terminal_helper::styled_detail_label("CVSS v4"),
+            content: styled_cvss_score(&advisory.cvss_severities.cvss_v4),
+        },
+        TerminalStyledLine {
+            label: terminal_helper::styled_detail_label("EPSS"),
+            content: styled_epss(advisory.epss),
+        },
+        TerminalStyledLine {
+            label: terminal_helper::styled_detail_label("Published"),
+            content: format!(
+                "{} (updated {})",
+                formatted_date(&advisory.published_at),
+                formatted_date(&advisory.updated_at)
+            ),
+        },
+    ];
     if let Some(withdrawn_at) = &advisory.withdrawn_at {
-        terminal.write_line(
-            format!(
-                "{}{}",
-                styled_detail_label("Withdrawn"),
-                style(formatted_date(withdrawn_at)).yellow().bold()
-            )
-            .as_str(),
-        )?;
+        lines.push(TerminalStyledLine {
+            label: terminal_helper::styled_detail_label("Withdrawn"),
+            content: style(formatted_date(withdrawn_at))
+                .yellow()
+                .bold()
+                .to_string(),
+        });
     }
-    for (index, vulnerability) in advisory.vulnerabilities.iter().enumerate() {
+    if !advisory.vulnerabilities.is_empty() {
         // Only the first affected package carries the label, the others line up under it.
-        let label = if index == 0 { "Affected" } else { "" };
-        terminal.write_line(
-            format!(
-                "{}{}",
-                styled_detail_label(label),
-                styled_vulnerability(vulnerability)
-            )
-            .as_str(),
-        )?;
+        lines.push(TerminalStyledLine {
+            label: terminal_helper::styled_detail_label("Affected"),
+            content: advisory
+                .vulnerabilities
+                .iter()
+                .map(styled_vulnerability)
+                .collect::<Vec<_>>()
+                .join("\n"),
+        });
     }
+
+    print_string_vec(terminal, generate_terminal_lines(&lines, None))?;
     terminal.write_line("")?;
 
     Ok(())
-}
-
-fn styled_detail_label(label: &str) -> String {
-    let label_width = 11usize;
-    style(format!("{label:<label_width$}")).dim().to_string()
 }
 
 fn styled_cvss_score(cvss: &CvssScore) -> String {

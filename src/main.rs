@@ -6,6 +6,7 @@ use kagami::ghsa::find_vulnerabilities;
 use kagami::github_client::init_octocrab;
 use kagami::logger::{initialize_default_logger, initialize_logger_by_loglevel};
 use kagami::output::output_to_stdout;
+use kagami::output_version::output_version;
 use kagami::{Config, KagamiCommands};
 use log::{debug, error, info, trace};
 use std::process::ExitCode;
@@ -24,6 +25,16 @@ async fn main() -> ExitCode {
             .unwrap_or(Config::default().log_level.unwrap()),
     );
     trace!("Command line options: {:?}.", command);
+
+    // version command
+    if command.version {
+        if let Err(e) = output_version(command.fancy) {
+            error!("Failed to write the version.");
+            error!("{}", e);
+            return ExitCode::FAILURE;
+        }
+        return ExitCode::SUCCESS;
+    }
 
     let parsed_config_file = match parse_config_file(&command.config_file_path) {
         Ok(f) => f,
