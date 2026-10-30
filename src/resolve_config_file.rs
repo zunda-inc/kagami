@@ -3,7 +3,7 @@ use log::error;
 use std::error::Error;
 use std::path::Path;
 
-pub fn resole_config_file_path(
+pub fn resolve_config_file_path(
     config_file_path: Option<impl Into<String>>,
 ) -> Result<String, Box<dyn Error>> {
     let config_path = match config_file_path {

@@ -7,7 +7,7 @@ use kagami::github_client::init_octocrab;
 use kagami::logger::{initialize_default_logger, initialize_logger_by_loglevel};
 use kagami::output::output_to_stdout;
 use kagami::output_version::output_version;
-use kagami::resolve_config_file::resole_config_file_path;
+use kagami::resolve_config_file::resolve_config_file_path;
 use kagami::{Config, KagamiCommands};
 use log::{debug, error, info, trace};
 use std::process::ExitCode;
@@ -37,7 +37,7 @@ async fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    let config_file_path = match resole_config_file_path(command.config_file_path.clone()) {
+    let config_file_path = match resolve_config_file_path(command.config_file_path.clone()) {
         Ok(c) => c,
         Err(e) => {
             error!("{}", e);
