@@ -273,7 +273,7 @@ fn print_advisory_details(terminal: &Term, advisory: &Advisory) -> Result<(), Bo
     Ok(())
 }
 
-fn styled_detail_label(label: &str) -> String {
+pub fn styled_detail_label(label: &str) -> String {
     style(label).dim().to_string()
 }
 
