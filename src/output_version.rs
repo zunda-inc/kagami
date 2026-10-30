@@ -2,6 +2,7 @@ use crate::KagamiCommands;
 use crate::terminal_helper::{TerminalStyledLine, generate_terminal_lines};
 use clap::CommandFactory;
 use console::{Term, style};
+use std::collections::VecDeque;
 use std::env;
 
 static LOGO: [&str; 15] = [
@@ -24,9 +25,9 @@ static LOGO: [&str; 15] = [
 
 #[derive(Clone)]
 struct Rgb {
-    red: u32,
-    green: u32,
-    blue: u32,
+    red: u8,
+    green: u8,
+    blue: u8,
 }
 
 static GRADIENT_COLOR: [Rgb; 6] = [
@@ -62,10 +63,43 @@ static GRADIENT_COLOR: [Rgb; 6] = [
     }, // Pastel red
 ];
 
-pub fn create_gradient_logo() {
+pub fn create_gradient_logo() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     // 最大30文字の行が15列あるとき、行ごとに1文字ずつ左にずらしていくので、合わせる色のテープは 30文字 + (15行 x ずらす1文字) = 45文字あれば良い
     // これをそれぞれの色の数、すなわち6色で割ると、1色あたり7.5文字になる
     // 45文字を7.5文字ごとに色を変えていった色のテープを作り、1文字ずつ左にずらしていくと、いい感じになる。
+    let shift_size_per_line = 1u32;
+    let max_logo_line_length = u32::try_from(LOGO.iter().map(|l| l.len()).max().unwrap_or(0))?;
+    let color_tape_length =
+        max_logo_line_length + (u32::try_from(LOGO.len())? * shift_size_per_line);
+    let length_by_color = (f64::try_from(color_tape_length)?
+        / f64::try_from(u32::try_from(GRADIENT_COLOR.len())?)?)
+    .ceil()
+    .to_bits();
+
+    let mut color_tape: VecDeque<&Rgb> = VecDeque::new();
+
+    for color in &GRADIENT_COLOR {
+        for _ in 0..length_by_color {
+            color_tape.push_back(color);
+        }
+    }
+
+    let mut lines: Vec<String> = vec![];
+
+    for logo_line in LOGO {
+        let mut line = String::new();
+        for (idx, c) in logo_line.chars().enumerate() {
+            let color = color_tape[idx];
+            line = line
+                + &style(c)
+                    .true_color(color.red, color.green, color.blue)
+                    .to_string();
+        }
+        lines.push(line);
+        color_tape.pop_front();
+    }
+
+    Ok(lines)
 }
 
 pub fn output_version(is_fancy_output: bool) -> Result<(), Box<dyn std::error::Error>> {
@@ -114,6 +148,8 @@ pub fn output_fancy_version(term: &Term) -> Result<(), Box<dyn std::error::Error
     ));
     details_strs.push(style("━".repeat(100)).cyan().to_string());
     details_strs.extend(details);
+
+    let gradient_logo = create_gradient_logo();
 
     Ok(())
 }
