@@ -5,11 +5,11 @@ use kagami::fail_on_severity::should_fail_on_severity;
 use kagami::ghsa::find_vulnerabilities;
 use kagami::github_client::init_octocrab;
 use kagami::logger::{initialize_default_logger, initialize_logger_by_loglevel};
-use kagami::output::{output_to_stdout};
+use kagami::output::output_to_stdout;
+use kagami::output_version::output_version;
 use kagami::{Config, KagamiCommands};
 use log::{debug, error, info, trace};
 use std::process::ExitCode;
-use kagami::output_version::output_version;
 
 #[tokio::main]
 async fn main() -> ExitCode {
