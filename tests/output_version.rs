@@ -26,7 +26,7 @@ fn fancy_version_shows_the_version_in_its_title() {
 
     assert!(output.status.success());
     assert!(
-        stdout.contains(format!("kagami {}", env!("CARGO_PKG_VERSION")).as_str()),
+        stdout.contains(format!("kagami@{}", env!("CARGO_PKG_VERSION")).as_str()),
         "{stdout}"
     );
 }

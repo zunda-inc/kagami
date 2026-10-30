@@ -4,6 +4,7 @@ use clap::CommandFactory;
 use console::{Term, measure_text_width, style};
 use std::collections::VecDeque;
 use std::env;
+use std::io::Write;
 
 static LOGO: [&str; 15] = [
     "    ▄████▄         ███",
@@ -114,7 +115,9 @@ pub fn output_version(is_fancy_output: bool) -> Result<(), Box<dyn std::error::E
     let stdout_terminal = Term::stdout();
 
     if !is_fancy_output {
-        stdout_terminal.write_line(&KagamiCommands::command().render_version())?;
+        // `render_version` already ends with a newline
+        stdout_terminal.write_line(KagamiCommands::command().render_version().trim_end())?;
+        return Ok(());
     }
 
     output_fancy_version(&stdout_terminal)?;
