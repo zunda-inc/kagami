@@ -26,7 +26,7 @@ clap = { version = "4.6.7", features = ["derive"] }
 simplelog = "0.12.2"
 log = "0.4.34"
 semver = "1.0.28"
-octocrab = "0.54.5"
+octocrab = "0.54.6"
 chrono = "0.4.45"
 itertools = "0.15.0"
 serde_json = "1.0.154"
